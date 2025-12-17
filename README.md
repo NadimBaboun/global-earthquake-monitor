@@ -6,6 +6,11 @@ The application fetches near real-time disaster data, cleans and structures the 
 
 ---
 
+## Live Demo
+👉 https://global-disaster-monitor-live-alerts-dashboard.streamlit.app
+
+---
+
 ## Data Source
 - **GDACS RSS Feed**: https://www.gdacs.org/xml/rss.xml  
 GDACS provides real-time alerts for natural disasters such as earthquakes, floods, cyclones, wildfires, and volcanic activity worldwide.
