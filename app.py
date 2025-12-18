@@ -234,14 +234,13 @@ summary_tbl = pd.DataFrame(
     }
 ).reset_index(drop=True)
 
-# Default behavior: all days
 if not show_all_days:
     summary_tbl = summary_tbl.tail(10)
 
 st.sidebar.dataframe(
     summary_tbl,
     use_container_width=True,
-    height=385,
+    height=387,
 )
 
 # Main charts
@@ -340,6 +339,7 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
+
 
 
 
