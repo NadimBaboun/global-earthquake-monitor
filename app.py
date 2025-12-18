@@ -290,7 +290,11 @@ st.pyplot(fig)
 # ---------- UPDATED: "Top countries" with a slider to control how many to show ----------
 st.subheader("Top countries (by alert count)")
 
-country_counts = filtered["country"].value_counts()
+country_counts = (
+    filtered["country"]
+    .value_counts()
+    .sort_values(ascending=False)
+)
 
 # Default number shown
 default_n = min(10, len(country_counts))
@@ -360,5 +364,6 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
+
 
 
