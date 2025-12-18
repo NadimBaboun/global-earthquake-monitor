@@ -342,15 +342,3 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
-
-
-
-
-
-
-
-
-
-
-
-
