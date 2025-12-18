@@ -257,15 +257,13 @@ with col2:
     st.line_chart(daily_avg_score)
 
 col3, col4 = st.columns(2)
-
 with col3:
     st.subheader("Cumulative alerts (selected range)")
-    st.line_chart(cumulative_alerts, height=350)
+    st.line_chart(cumulative_alerts)
 
 with col4:
     st.subheader("Alert level distribution")
-    level_counts = filtered["alert_level"].value_counts()
-    st.bar_chart(level_counts, height=350)
+    st.bar_chart(level_counts)
 
 st.subheader("Event type proportions")
 type_counts = filtered["event_type"].value_counts()
