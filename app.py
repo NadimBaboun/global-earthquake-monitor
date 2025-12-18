@@ -270,47 +270,15 @@ with col4:
     )
     st.bar_chart(level_counts, height= 369)
 
-st.subheader("Event type proportions")
-type_counts = filtered["event_type"].value_counts()
-fig, ax = plt.subplots(figsize=(5, 5))
-ax.pie(type_counts.values, labels=type_counts.index.astype(str), autopct="%1.1f%%", startangle=90)
-st.pyplot(fig)
-
-# Top countries + slider
 st.subheader("Top countries (by alert count)")
 
-country_counts = filtered["country"].value_counts().sort_values(ascending=False)
-
-default_n = min(10, len(country_counts))
-max_n = min(60, len(country_counts))
-top_n = st.session_state.get("top_n_countries", default_n)
-
-st.bar_chart(country_counts.head(top_n))
-
-st.markdown(
-    """
-    <style>
-    /* Slider track */
-    div[data-baseweb="slider"] > div > div > div {
-        background-color: #1f77b4 !important;
-    }
-    /* Slider knob */
-    div[data-baseweb="slider"] [role="slider"] {
-        background-color: #1f77b4 !important;
-        border-color: #1f77b4 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
+country_counts = (
+    filtered["country"]
+    .value_counts()
+    .sort_values(ascending=False)
 )
 
-top_n = st.slider(
-    "Number of countries shown",
-    min_value=5,
-    max_value=max_n if max_n >= 5 else 5,
-    value=top_n,
-    key="top_n_countries",
-)
+st.bar_chart(country_counts, height=500)
 
 st.subheader("Map (highest alert score)")
 map_df = (
@@ -335,23 +303,3 @@ st.dataframe(
     filtered.sort_values("main_time", ascending=False)[show_cols].head(50),
     use_container_width=True,
 )
-
-with st.expander("Debug: show raw feed preview (first 400 chars)"):
-    try:
-        st.code(fetch_gdacs_rss_xml()[:400])
-    except Exception as e:
-        st.error(str(e))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
