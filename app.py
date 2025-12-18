@@ -148,13 +148,13 @@ def load_data_with_cache():
                 if col in cached.columns:
                     cached[col] = cached[col].fillna("Unknown")
 
-            return cached, f"GDACS fetch failed — using cached file. Error: {e}"
+            return cached, "Error: GDACS fetch failed — using cached file."
 
-        return pd.DataFrame(), f"GDACS fetch failed and no cache found. Error: {e}"
+        return pd.DataFrame(), "Error: GDACS fetch failed and no cache found."
 
 
 # ---------- UI ----------
-st.title("Global Disaster Monitor — GDACS Live Alerts Dashboard")
+st.title("Global Disaster Monitor — Live Alerts Dashboard")
 st.caption("Source: GDACS RSS feed (near real-time natural disaster alerts)")
 
 df, warn = load_data_with_cache()
@@ -332,3 +332,4 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
+
