@@ -292,11 +292,35 @@ st.subheader("Top countries (by alert count)")
 
 country_counts = filtered["country"].value_counts()
 
-max_n = max(1, min(60, len(country_counts)))  # cap to keep it readable
-top_n = st.slider("How many countries to show", 5, max_n if max_n >= 5 else 5, min(10, max_n))
+# Default number shown
+default_n = min(10, len(country_counts))
+max_n = min(60, len(country_counts))
 
-top_countries = country_counts.head(top_n)
-st.bar_chart(top_countries)
+top_n = st.session_state.get("top_n_countries", default_n)
+
+# Chart first (OG look)
+st.bar_chart(country_counts.head(top_n))
+
+# --- Blue slider styling (CSS hack, safe & common in Streamlit) ---
+st.markdown(
+    """
+    <style>
+    div[data-baseweb="slider"] > div > div > div {
+        background-color: #1f77b4 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Slider UNDER the chart
+top_n = st.slider(
+    "Number of countries shown",
+    min_value=5,
+    max_value=max_n,
+    value=top_n,
+    key="top_n_countries",
+)
 # -----------------------------------------------------------------------------------
 
 st.subheader("Map (highest alert score)")
@@ -329,3 +353,4 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
+
