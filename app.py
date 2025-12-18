@@ -220,21 +220,29 @@ daily_count = filtered.groupby("date_utc").size()
 daily_avg_score = filtered.groupby("date_utc")["alert_score"].mean()
 cumulative_alerts = daily_count.cumsum()
 
-# Last 10 days table
-last_10 = (
-    pd.DataFrame(
-        {
-            "date_utc": daily_count.index,
-            "alerts": daily_count.values,
-            "avg_alert_score": daily_avg_score.reindex(daily_count.index).values,
-        }
-    )
-    .tail(10)
-    .reset_index(drop=True)
-)
+# Daily Summary
+st.sidebar.subheader("Daily summary")
 
-st.sidebar.subheader("Last 10 days")
-st.sidebar.dataframe(last_10, use_container_width=True)
+# Toggle: default is last 10 days
+show_all_days = st.sidebar.checkbox("Show all days", value=False)
+
+summary_tbl = pd.DataFrame(
+    {
+        "date_utc": daily_count.index,
+        "alerts": daily_count.values,
+        "avg_alert_score": daily_avg_score.reindex(daily_count.index).values,
+    }
+).reset_index(drop=True)
+
+# Default behavior: last 10 days
+if not show_all_days:
+    summary_tbl = summary_tbl.tail(10)
+
+st.sidebar.dataframe(
+    summary_tbl,
+    use_container_width=True,
+    height=300,  # makes it scrollable when showing all days
+)
 
 # Main charts
 col1, col2 = st.columns(2)
@@ -332,4 +340,5 @@ with st.expander("Debug: show raw feed preview (first 400 chars)"):
         st.code(fetch_gdacs_rss_xml()[:400])
     except Exception as e:
         st.error(str(e))
+
 
