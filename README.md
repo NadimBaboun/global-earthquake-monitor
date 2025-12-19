@@ -7,7 +7,7 @@ The application fetches near real-time disaster data, cleans and structures the 
 ---
 
 ## Live Demo
-👉 https://global-disaster-monitor-live-alerts-dashboard.streamlit.app
+👉 https://global-disaster-live-monitor.streamlit.app
 
 ---
 
