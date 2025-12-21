@@ -1,4 +1,4 @@
-# Global Disaster Monitor (GDACS)
+# Global Disaster Monitor
 
 This project is an interactive **data science dashboard** built with **Streamlit** that monitors global natural disaster alerts using the **GDACS (Global Disaster Alert and Coordination System)** RSS feed.
 
