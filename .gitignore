@@ -25,3 +25,7 @@ desktop.ini
 
 # Project-specific
 GDACS_cache.csv
+GDACS_data.xml
+USGS_cache.csv
+earthquakes.xml
+_test_*.py
