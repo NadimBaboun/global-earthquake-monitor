@@ -29,8 +29,8 @@ The application fetches earthquake data with user-selectable date ranges (includ
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/NadimBaboun/Global-Disaster-Live-Monitor.git
-   cd Global-Disaster-Live-Monitor
+   git clone https://github.com/NadimBaboun/global-earthquake-monitor.git
+   cd global-earthquake-monitor
    ```
 
 2. **Install dependencies**
@@ -40,7 +40,7 @@ The application fetches earthquake data with user-selectable date ranges (includ
 
 3. **Run the application**
    ```bash
-   streamlit run app.py
+   streamlit run src/app.py
    ```
 
 4. **Open your browser** to `http://localhost:8501`
@@ -79,12 +79,15 @@ The application fetches earthquake data with user-selectable date ranges (includ
 ## 🗂️ Project Structure
 
 ```
-📁 Global-Disaster-Live-Monitor/
+📁 global-earthquake-monitor/
+├── src/                  # Python source code
+│   ├── app.py            # Streamlit UI (filters, charts, layout)
+│   ├── data.py           # Data layer (USGS fetch, parse, cache, XML export)
+│   └── chart_utils.py    # Dark-themed chart helpers
+├── xml/                  # XML / XSLT files
+│   ├── quakeml_to_map.xsl  # XSLT transformation → interactive Leaflet map
+│   └── testing.xml         # Sample QuakeML event for reference
 ├── assets/               # Screenshots and media
-├── app.py                # Streamlit UI (filters, charts, layout)
-├── data.py               # Data layer (USGS fetch, parse, cache, XML export)
-├── chart_utils.py        # Dark-themed chart helpers
-├── earthquakes.xml       # Auto-generated QuakeML XML (for XSLT transformation)
 ├── requirements.txt      # Python dependencies
 ├── .gitignore            # Excluded files (cache, bytecode, etc.)
 └── README.md
@@ -94,9 +97,10 @@ The application fetches earthquake data with user-selectable date ranges (includ
 
 | File | Responsibility | Key Functions |
 |---|---|---|
-| **`data.py`** | USGS API fetching & caching | `fetch_usgs_geojson()`, `fetch_usgs_xml()`, `geojson_to_df()`, `load_data_with_cache()` |
-| **`chart_utils.py`** | Chart styling | `dark_chart()` context manager, `darken_fig()` |
-| **`app.py`** | UI layout & filters | Date range picker, magnitude slider, chart rendering, XML download |
+| **`src/data.py`** | USGS API fetching & caching | `fetch_usgs_geojson()`, `fetch_usgs_xml()`, `geojson_to_df()`, `load_data_with_cache()` |
+| **`src/chart_utils.py`** | Chart styling | `dark_chart()` context manager, `darken_fig()` |
+| **`src/app.py`** | UI layout & filters | Date range picker, magnitude slider, chart rendering, XML download |
+| **`xml/quakeml_to_map.xsl`** | XSLT transformation | Transforms QuakeML XML into interactive Leaflet map HTML |
 
 ---
 

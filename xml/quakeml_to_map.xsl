@@ -21,7 +21,7 @@
   <xsl:output method="html" encoding="UTF-8" indent="yes"/>
 
   <!-- ════════════════════════════════════════════════════════ -->
-  <!-- Root template                                           -->
+  <!-- Root template                                            -->
   <!-- ════════════════════════════════════════════════════════ -->
   <xsl:template match="/">
     <html lang="en">
@@ -275,7 +275,7 @@
   </xsl:template>
 
   <!-- ════════════════════════════════════════════════════════ -->
-  <!-- Helper: escape quotes for JavaScript strings            -->
+  <!-- Helper: escape quotes for JavaScript strings             -->
   <!-- ════════════════════════════════════════════════════════ -->
   <xsl:template name="escape-js">
     <xsl:param name="text"/>
