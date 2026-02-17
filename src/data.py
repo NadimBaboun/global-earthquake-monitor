@@ -1,5 +1,5 @@
 """
-Data layer for the Global Disaster Monitor.
+Data layer for the Global Earthquake Monitor.
 
 Fetches earthquake data from the USGS Earthquake Catalog API, parses it into
 a pandas DataFrame, saves the raw QuakeML XML for XSLT transformation, and
@@ -133,7 +133,7 @@ def save_raw_xml(xml_text: str):
     ``earthquakes.xml`` in a browser automatically applies the XSLT
     and renders the interactive Leaflet map.
     """
-    PI = '<?xml-stylesheet type="text/xsl" href="quakeml_to_map.xsl"?>'
+    PI = '<?xml-stylesheet type="text/xsl" href="xml/quakeml_to_map.xsl"?>'
     try:
         # Insert PI right after the XML declaration
         if xml_text.startswith("<?xml"):
