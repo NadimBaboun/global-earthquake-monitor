@@ -21,13 +21,16 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────
+import tempfile
+
+_tmp = tempfile.gettempdir()
 
 CONFIG = {
     # USGS Earthquake Catalog API
     "api_base": "https://earthquake.usgs.gov/fdsnws/event/1/query",
     "default_min_magnitude": 2.5,
-    "cache_file": "USGS_cache.csv",
-    "xml_output_file": "earthquakes.xml",
+    "cache_file": os.path.join(_tmp, "USGS_cache.csv"),
+    "xml_output_file": os.path.join(_tmp, "earthquakes.xml"),
     "cache_ttl": 600,
 
     # UI defaults
