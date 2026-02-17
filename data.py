@@ -124,8 +124,21 @@ def fetch_usgs_xml(from_date: str, to_date: str, min_magnitude: float = None) ->
 
 
 def save_raw_xml(xml_text: str):
-    """Save the raw QuakeML XML to disk for XSLT transformation."""
+    """Save the raw QuakeML XML to disk for XSLT transformation.
+
+    Injects an ``xml-stylesheet`` processing instruction so that opening
+    ``earthquakes.xml`` in a browser automatically applies the XSLT
+    and renders the interactive Leaflet map.
+    """
+    PI = '<?xml-stylesheet type="text/xsl" href="quakeml_to_map.xsl"?>'
     try:
+        # Insert PI right after the XML declaration
+        if xml_text.startswith("<?xml"):
+            end_of_decl = xml_text.index("?>") + 2
+            xml_text = xml_text[:end_of_decl] + "\n" + PI + xml_text[end_of_decl:]
+        else:
+            xml_text = PI + "\n" + xml_text
+
         with open(CONFIG["xml_output_file"], "w", encoding="utf-8") as f:
             f.write(xml_text)
         logger.info("Saved raw XML to %s", CONFIG["xml_output_file"])

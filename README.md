@@ -1,14 +1,14 @@
-# Global Disaster Monitor — Live Alerts Dashboard
+# Global Earthquake Monitor — Live Dashboard
 
-A real-time **data science dashboard** built with **Streamlit** that monitors global natural disaster alerts using the **GDACS (Global Disaster Alert and Coordination System)** RSS feed.
+A real-time **data science dashboard** built with **Streamlit** that monitors global earthquake activity using the **USGS Earthquake Catalog API**.
 
-The application fetches near real-time disaster data, parses and cleans the XML feed, performs time-series analysis, and presents interactive visualizations with filtering capabilities.
+The application fetches earthquake data with user-selectable date ranges (including historical data going back years), exports raw **QuakeML XML** for XSLT transformation, and presents interactive visualizations with filtering capabilities.
 
 ---
 
 ## 🔗 Live Demo
 
-👉 **[https://global-disaster-live-monitor.streamlit.app](https://global-disaster-live-monitor.streamlit.app)**
+👉 **[https://global-earthquake-monitor.streamlit.app](https://global-earthquake-monitor.streamlit.app)**
 
 ---
 
@@ -16,7 +16,7 @@ The application fetches near real-time disaster data, parses and cleans the XML 
 
 ![Dashboard Screenshot](assets/dashboard_screenshot.png)
 
-*Interactive dashboard showing daily alert trends, severity distributions, event type breakdowns, and geographic mapping of high-severity alerts.*
+*Interactive dashboard showing daily earthquake trends, magnitude distributions, alert level breakdowns, depth analysis, and geographic mapping.*
 
 ---
 
@@ -50,21 +50,29 @@ The application fetches near real-time disaster data, parses and cleans the XML 
 ## 📊 Key Features
 
 ### Data Pipeline
-- **Live XML ingestion** from GDACS RSS feed with robust error handling
-- **Network resilience**: Automatic fallback to cached CSV on fetch failures
-- **Data validation**: Detects and rejects HTML/malformed responses before parsing
+- **USGS Earthquake Catalog API** — reliable, free, no API key required
+- **Historical data access** — select any date range (days, months, or years back)
+- **Dual-format fetch** — GeoJSON for dashboard, QuakeML XML for export
+- **Network resilience** — automatic fallback to cached CSV on fetch failures
+
+### XML Export for XSLT
+- Raw **QuakeML XML** saved to `earthquakes.xml` on every fetch
+- **📥 Download XML** button in the sidebar for one-click export
+- Standard XML format ideal for XSLT transformation into custom presentations
 
 ### Data Processing
-- XML parsing with namespace handling (`geo:Point`, `gdacs:eventtype`, etc.)
-- Timezone-aware datetime conversions (RFC-822 → UTC)
-- Unified event time field (`from_date` preferred, `pub_date` fallback)
-- Missing value handling (`NaN` → `"Unknown"` for categorical fields)
+- GeoJSON parsing with automatic field extraction
+- Magnitude-based alert level classification (🔴 ≥7.0, 🟠 ≥5.5, 🟢 ≥4.0)
+- Country/region extraction from USGS place strings
+- USGS significance score mapping for severity ranking
 
 ### Interactive Dashboard
-- **Multi-filter system**: Event type, alert level, country, date range
-- **KPI sidebar**: Quick-glance aggregate metrics
-- **12+ chart types**: Line, bar, pie, boxplot, stacked bar, geographic map
-- **Dark-themed UI**: Custom matplotlib styling for readability
+- **Date range picker** — drives the API query for historical or recent data
+- **Magnitude slider** — filter earthquakes by minimum magnitude (1.0–8.0)
+- **Multi-filter system** — alert level, country/region
+- **KPI sidebar** — earthquake count, average/max magnitude
+- **10+ chart types** — line, bar, pie, histogram, boxplot, scatter, stacked bar, geographic map
+- **Dark-themed UI** — custom matplotlib styling for readability
 
 ---
 
@@ -74,8 +82,9 @@ The application fetches near real-time disaster data, parses and cleans the XML 
 📁 Global-Disaster-Live-Monitor/
 ├── assets/               # Screenshots and media
 ├── app.py                # Streamlit UI (filters, charts, layout)
-├── data.py               # Data layer (fetch, parse, cache)
+├── data.py               # Data layer (USGS fetch, parse, cache, XML export)
 ├── chart_utils.py        # Dark-themed chart helpers
+├── earthquakes.xml       # Auto-generated QuakeML XML (for XSLT transformation)
 ├── requirements.txt      # Python dependencies
 ├── .gitignore            # Excluded files (cache, bytecode, etc.)
 └── README.md
@@ -85,54 +94,58 @@ The application fetches near real-time disaster data, parses and cleans the XML 
 
 | File | Responsibility | Key Functions |
 |---|---|---|
-| **`data.py`** | Data fetching & caching | `fetch_gdacs_rss_xml()`, `rss_to_df()`, `load_data_with_cache()` |
+| **`data.py`** | USGS API fetching & caching | `fetch_usgs_geojson()`, `fetch_usgs_xml()`, `geojson_to_df()`, `load_data_with_cache()` |
 | **`chart_utils.py`** | Chart styling | `dark_chart()` context manager, `darken_fig()` |
-| **`app.py`** | UI layout & filters | Streamlit components, filter logic, chart rendering |
+| **`app.py`** | UI layout & filters | Date range picker, magnitude slider, chart rendering, XML download |
 
 ---
 
 ## 🌐 Data Source
 
-**GDACS (Global Disaster Alert and Coordination System)**  
-📍 [https://www.gdacs.org/xml/rss.xml](https://www.gdacs.org/xml/rss.xml)
+**USGS Earthquake Hazards Program — Earthquake Catalog API**  
+📍 [https://earthquake.usgs.gov/fdsnws/event/1/](https://earthquake.usgs.gov/fdsnws/event/1/)
 
-GDACS provides real-time alerts for:
-- 🌍 Earthquakes
-- 🌊 Floods
-- 🌀 Tropical cyclones
-- 🔥 Wildfires
-- 🌋 Volcanic activity
+The API provides comprehensive earthquake data including:
+- 🌍 **Magnitude & type** (Mw, Mb, Ml, etc.)
+- 📏 **Depth** (km below surface)
+- 📍 **Precise location** (latitude, longitude, place name)
+- 🌊 **Tsunami flag** — whether a tsunami advisory was issued
+- 👥 **Felt reports** — number of people who reported feeling the earthquake
+- 📊 **Significance score** — composite severity metric (0–1000+)
+
+Output formats: **QuakeML (XML)**, GeoJSON, CSV, KML, Text
 
 ---
 
 ## 🛠️ Technical Highlights
 
 ### Error Handling
-- **Specific exception catching**: `requests.RequestException`, `ET.ParseError`, `ValueError` (avoids swallowing real bugs)
+- **Specific exception catching**: `requests.RequestException`, `ValueError`, `KeyError`
 - **Logging integration**: Failed fetches are logged for debugging on Streamlit Cloud
 - **Cache write isolation**: Disk errors don't prevent showing fresh data
+- **XML fetch isolation**: XML export failure doesn't block dashboard rendering
 
 ### Performance
-- **Streamlit caching**: `@st.cache_data(ttl=600)` for RSS fetches
-- **Pre-computed aggregates**: Daily counts/scores computed once and reused
+- **Streamlit caching**: `@st.cache_data(ttl=600)` for API fetches
+- **Pre-computed aggregates**: Daily counts/magnitudes computed once and reused
 - **Efficient filtering**: Single boolean mask for all sidebar selections
 
 ### Code Quality
 - **Separation of concerns**: Data layer, UI layer, chart utilities in separate modules
 - **Comprehensive docstrings**: All public functions documented
-- **Inline comments**: Explain *why*, not *what* (e.g., "prefer from_date so charts reflect event timing, not reporting delay")
+- **Inline comments**: Explain *why*, not *what*
 
 ---
 
 ## 📈 Data Science Concepts Demonstrated
 
-- **Data ingestion** from external APIs (RSS/XML)
-- **XML parsing** with namespace handling
-- **Data cleaning** and type conversion (datetime, numeric coercion)
-- **Feature engineering** (unified event time, categorical encoding)
+- **Data ingestion** from external APIs (REST/JSON + XML)
+- **XML export** for XSLT transformation pipelines
+- **Data cleaning** and type conversion (epoch timestamps, numeric coercion)
+- **Feature engineering** (alert level derivation from magnitude, country extraction from place strings)
 - **Time-series analysis** (daily aggregates, rolling averages, cumulative sums)
-- **Exploratory data analysis** (distributions, trends, geographic patterns)
-- **Interactive visualization** (filters, multi-chart dashboards)
+- **Exploratory data analysis** (distributions, depth vs magnitude scatter, geographic patterns)
+- **Interactive visualization** (filters, multi-chart dashboards, map rendering)
 
 ---
 
