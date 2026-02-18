@@ -8,7 +8,7 @@ The application fetches earthquake data with user-selectable date ranges (includ
 
 ## 🔗 Live Demo
 
-👉 **[https://global-earthquake-monitor.streamlit.app](https://global-earthquake-monitor.streamlit.app)**
+👉 **[https://global-earthquake-live-monitor.streamlit.app](https://global-earthquake-live-monitor.streamlit.app)**
 
 ---
 

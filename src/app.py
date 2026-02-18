@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime, timezone, timedelta
 from data import CONFIG, load_data_with_cache
 from chart_utils import dark_chart, DARK_FG
+from map_utils import render_earthquake_map
 
 st.set_page_config(page_title="Global Earthquake Monitor (USGS)", page_icon="🌍", layout="wide")
 
@@ -118,7 +119,7 @@ summary_tbl.index = range(1, len(summary_tbl) + 1)
 
 st.sidebar.dataframe(
     summary_tbl,
-    use_container_width=True,
+    width="stretch",
     height=CONFIG["sidebar_table_height"],
 )
 
@@ -194,7 +195,7 @@ with col7:
         data = [box_df.loc[box_df["country"] == c, "magnitude"].values for c in order]
 
         with dark_chart("Magnitude by country (top 10)", "Country", "Magnitude", rotate_x=True) as (fig, ax):
-            ax.boxplot(data, labels=order, showfliers=False)
+            ax.boxplot(data, tick_labels=order, showfliers=False)
     else:
         st.info("Not enough data for boxplot.")
 
@@ -235,11 +236,6 @@ with col10:
         ax.plot(daily_count.index, daily_count.values, label="Daily", alpha=0.4)
         ax.plot(rolling.index, rolling.values, label="7-day rolling avg")
 
-# ---------- Map ----------
-st.subheader("Earthquake Map (by significance)")
-map_df = (
-    filtered.dropna(subset=["latitude", "longitude", "magnitude"])
-    .sort_values("magnitude", ascending=False)
-    .head(max_points)
-)
-st.map(map_df[["latitude", "longitude"]])
+# ---------- Interactive Map (pydeck) ----------
+st.subheader("Earthquake Map (hover for details)")
+render_earthquake_map(filtered, max_points=max_points)

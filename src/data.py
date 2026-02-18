@@ -125,7 +125,6 @@ def fetch_usgs_xml(from_date: str, to_date: str, min_magnitude: float = None) ->
     r.raise_for_status()
     return r.text
 
-
 def save_raw_xml(xml_text: str):
     """Save the raw QuakeML XML to disk for XSLT transformation.
 
@@ -201,7 +200,6 @@ def geojson_to_df(data: dict) -> pd.DataFrame:
         df[col] = df[col].fillna("Unknown")
 
     return df
-
 
 def load_data_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
     """Fetch USGS earthquake data and cache to CSV. Falls back to cache on failure.
