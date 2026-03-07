@@ -12,7 +12,6 @@ st.set_page_config(page_title="Global Earthquake Monitor (USGS)", page_icon="�
 
 # ---------- UI ----------
 st.title("Global Earthquake Monitor — Live Dashboard")
-st.caption("Source: USGS Earthquake Catalog API · Historical data with date range selection · XML export for XSLT")
 
 # Sidebar: date range picker (drives the API query)
 st.sidebar.header("Data Source (UTC)")
@@ -38,7 +37,8 @@ min_mag = st.sidebar.slider(
 from_str = start_d.strftime("%Y-%m-%d")
 to_str = end_d.strftime("%Y-%m-%d")
 
-df, warn = load_data_with_cache(from_date=from_str, to_date=to_str, min_magnitude=min_mag)
+with st.spinner("Fetching earthquake data..."):
+    df, warn = load_data_with_cache(from_date=from_str, to_date=to_str, min_magnitude=min_mag)
 if warn:
     st.warning(warn)
 
@@ -65,14 +65,9 @@ all_levels = sorted([x for x in df["alert_level"].dropna().unique().tolist() if 
 all_countries = sorted([x for x in df["country"].dropna().unique().tolist() if x])
 
 selected_levels = st.sidebar.multiselect("Alert level", all_levels, default=all_levels)
-selected_countries = st.sidebar.multiselect("Country / Region", all_countries)
+selected_countries = st.sidebar.multiselect("Country / Region", all_countries, default=all_countries)
 
 max_points = st.sidebar.slider("Map points", CONFIG["map_points_min"], CONFIG["map_points_max"], CONFIG["map_points_default"], CONFIG["map_points_min"])
-
-# Require at least one country selection
-if not selected_countries:
-    st.info("Please select at least one country/region to continue.")
-    st.stop()
 
 # Apply filters
 mask = (
@@ -88,12 +83,23 @@ if filtered.empty:
 
 # Quick-glance metrics
 st.sidebar.subheader("Summary")
-st.sidebar.write("Earthquakes:", int(len(filtered)))
+
+# Compact metric styling for the sidebar
+st.markdown("""
+<style>
+[data-testid="stSidebar"] [data-testid="stMetricValue"] { font-size: 1.1rem; }
+[data-testid="stSidebar"] [data-testid="stMetricLabel"] { font-size: 0.75rem; }
+[data-testid="stSidebar"] [data-testid="stMetric"] { padding: 4px 0; }
+</style>
+""", unsafe_allow_html=True)
 
 avg_mag = pd.to_numeric(filtered["magnitude"], errors="coerce").mean()
 max_mag = pd.to_numeric(filtered["magnitude"], errors="coerce").max()
-st.sidebar.write("Avg magnitude:", round(float(avg_mag), 1) if pd.notna(avg_mag) else "N/A")
-st.sidebar.write("Max magnitude:", round(float(max_mag), 1) if pd.notna(max_mag) else "N/A")
+
+m1, m2, m3 = st.sidebar.columns(3)
+m1.metric("Quakes", int(len(filtered)))
+m2.metric("Avg Mag", round(float(avg_mag), 1) if pd.notna(avg_mag) else "N/A")
+m3.metric("Max Mag", round(float(max_mag), 1) if pd.notna(max_mag) else "N/A")
 
 # Pre-compute daily aggregates
 daily_count = filtered.groupby("date_utc").size()
@@ -155,7 +161,7 @@ with col5:
     alert_counts = filtered["alert_level"].value_counts().sort_values(ascending=False)
 
     with dark_chart(title="Alert level distribution", figsize=CONFIG["figsize_square"], tight=False) as (fig, ax):
-        colors = {"Red": "#ef4444", "Orange": "#f97316", "Green": "#22c55e", "Unknown": "#6b7280"}
+        colors = {"Red": "#ef4444", "Orange": "#f97316", "Yellow": "#f59e0b", "Green": "#22c55e", "Unknown": "#6b7280"}
         pie_colors = [colors.get(l, "#6b7280") for l in alert_counts.index]
         ax.pie(
             alert_counts.values,
@@ -172,7 +178,7 @@ with col6:
     mags = pd.to_numeric(filtered["magnitude"], errors="coerce").dropna()
 
     with dark_chart("Distribution of magnitudes", "Magnitude", "Frequency", figsize=(8, 4)) as (fig, ax):
-        ax.hist(mags, bins=CONFIG["map_points_min"], color="#3b82f6", edgecolor="#1e40af")
+        ax.hist(mags, bins=CONFIG["histogram_bins"], color="#3b82f6", edgecolor="#1e40af")
 
 col7, col8 = st.columns(2)
 

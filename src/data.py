@@ -38,6 +38,7 @@ CONFIG = {
     "map_points_min": 20,
     "map_points_max": 500,
     "map_points_default": 200,
+    "histogram_bins": 20,
 
     # Chart sizing
     "chart_height_small": 369,
@@ -61,7 +62,7 @@ def _mag_to_alert_level(mag):
     if mag >= 5.5:
         return "Orange"
     if mag >= 4.0:
-        return "Green"
+        return "Yellow"
     return "Green"
 
 
@@ -79,7 +80,7 @@ def _extract_country(place_str: str) -> str:
 # Public API
 # ──────────────────────────────────────────────
 
-@st.cache_data(ttl=CONFIG["cache_ttl"])
+@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
 def fetch_usgs_geojson(from_date: str, to_date: str, min_magnitude: float = None) -> dict:
     """
     Fetch earthquake data from USGS in GeoJSON format.
@@ -105,7 +106,7 @@ def fetch_usgs_geojson(from_date: str, to_date: str, min_magnitude: float = None
     return r.json()
 
 
-@st.cache_data(ttl=CONFIG["cache_ttl"])
+@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
 def fetch_usgs_xml(from_date: str, to_date: str, min_magnitude: float = None) -> str:
     """
     Fetch the same earthquake data from USGS in QuakeML XML format.

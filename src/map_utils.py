@@ -14,6 +14,7 @@ import streamlit as st
 ALERT_COLORS = {
     "Red":     [239, 68, 68, 180],
     "Orange":  [249, 115, 22, 180],
+    "Yellow": [234, 179, 8, 180],
     "Green":   [34, 197, 94, 180],
     "Unknown": [107, 114, 128, 150],
 }
@@ -25,10 +26,10 @@ def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Colour by alert level — separate RGBA columns for pydeck serialisation
-    df["color_r"] = df["alert_level"].map({"Red": 239, "Orange": 249, "Green": 34, "Unknown": 107}).fillna(107).astype(int)
-    df["color_g"] = df["alert_level"].map({"Red": 68, "Orange": 115, "Green": 197, "Unknown": 114}).fillna(114).astype(int)
-    df["color_b"] = df["alert_level"].map({"Red": 68, "Orange": 22, "Green": 94, "Unknown": 128}).fillna(128).astype(int)
-    df["color_a"] = df["alert_level"].map({"Red": 180, "Orange": 180, "Green": 180, "Unknown": 150}).fillna(150).astype(int)
+    df["color_r"] = df["alert_level"].map({"Red": 239, "Orange": 249, "Yellow": 234, "Green": 34, "Unknown": 107}).fillna(107).astype(int)
+    df["color_g"] = df["alert_level"].map({"Red": 68, "Orange": 115, "Yellow": 179, "Green": 197, "Unknown": 114}).fillna(114).astype(int)
+    df["color_b"] = df["alert_level"].map({"Red": 68, "Orange": 22, "Yellow": 8, "Green": 94, "Unknown": 128}).fillna(128).astype(int)
+    df["color_a"] = df["alert_level"].map({"Red": 180, "Orange": 180, "Yellow": 180, "Green": 180, "Unknown": 150}).fillna(150).astype(int)
 
     # Radius scaled by magnitude (min 3 000 m, grows exponentially)
     df["radius"] = df["magnitude"].apply(lambda m: max(3000, 2 ** (m - 1) * 2000))
