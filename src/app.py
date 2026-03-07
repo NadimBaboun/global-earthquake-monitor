@@ -12,7 +12,6 @@ st.set_page_config(page_title="Global Earthquake Monitor (USGS)", page_icon="�
 
 # ---------- UI ----------
 st.title("Global Earthquake Monitor — Live Dashboard")
-st.caption("Source: USGS Earthquake Catalog API · Historical data with date range selection · XML export for XSLT")
 
 # Sidebar: date range picker (drives the API query)
 st.sidebar.header("Data Source (UTC)")

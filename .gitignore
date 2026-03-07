@@ -29,3 +29,5 @@ GDACS_data.xml
 USGS_cache.csv
 earthquakes.xml
 _test_*.py
+docs/
+create_issues.py
