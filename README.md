@@ -1,5 +1,5 @@
 # Global Earthquake Monitor — Live Dashboard
-[![CI](https://github.com/NadimBaboun/global-earthquake-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/NadimBaboun/global-earthquake-monitor/actions/workflows/ci.yml)
+[![CI](https://github.com/nadeemtsf/global-earthquake-monitor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nadeemtsf/global-earthquake-monitor/actions/workflows/ci.yml)
 
 A real-time **data science dashboard** built with **Streamlit** that monitors global earthquake activity using the **USGS Earthquake Catalog API**.
 
