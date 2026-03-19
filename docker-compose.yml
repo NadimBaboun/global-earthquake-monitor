@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./.cache:/app/.cache
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+    restart: unless-stopped
+
+networks:
+  default:
+    name: earthquake-monitor-network
