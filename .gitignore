@@ -25,10 +25,6 @@ Thumbs.db
 desktop.ini
 
 # Project-specific
-GDACS_cache.csv
-GDACS_data.xml
-USGS_cache.csv
-earthquakes.xml
+.cache/
 _test_*.py
-docs/
 create_issues.py

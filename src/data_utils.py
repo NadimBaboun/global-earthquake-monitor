@@ -63,8 +63,16 @@ def normalize_schema(df: pd.DataFrame) -> pd.DataFrame:
     for col, default_value in expected.items():
         if col not in df.columns:
             df[col] = default_value
+            
+    # Explicitly casting key columns to avoid dtype inference ambiguity 
+    # (Fixes Pandas FuturesWarnings about all-NA columns during concat)
+    numeric_cols = ["magnitude", "depth_km", "latitude", "longitude", "alert_score", "felt"]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            
     df["main_time"] = pd.to_datetime(df["main_time"], utc=True, errors="coerce")
     df["date_utc"] = df["main_time"].dt.date
     for col in ["event_type", "alert_level", "country", "source"]:
-        df[col] = df[col].fillna("Unknown")
+        df[col] = df[col].fillna("Unknown").astype(str)
     return df

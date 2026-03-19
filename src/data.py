@@ -18,6 +18,9 @@ from providers import usgs_provider, gdacs_provider
 logger = logging.getLogger(__name__)
 CACHE_TTL = CONFIG["cache_ttl"]
 
+# Ensure persistent cache directory exists
+os.makedirs(".cache", exist_ok=True)
+
 # Aliases for compatibility (e.g. for existing tests)
 _mag_to_alert_level = mag_to_alert_level
 _extract_country = extract_country
@@ -68,12 +71,14 @@ def load_data_by_source(from_date=None, to_date=None, min_magnitude=None, source
             g_df, g_w = future_gdacs.result()
         
         frames = [f for f in [u_df, g_df] if f is not None and not f.empty]
-        merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-        if not merged.empty:
-            merged = normalize_schema(merged).sort_values("main_time")
+        if not frames:
+            return normalize_schema(pd.DataFrame()), " | ".join([w for w in [u_w, g_w] if w]) or None
+            
+        merged = pd.concat(frames, ignore_index=True)
+        merged = normalize_schema(merged).sort_values("main_time")
         warns = [w for w in [u_w, g_w] if w]
         return merged, " | ".join(warns) if warns else None
-    return pd.DataFrame(), f"⚠️ Unknown source: {source}"
+    return normalize_schema(pd.DataFrame()), f"⚠️ Unknown source: {source}"
 
 def _load_usgs_with_cache(from_date, to_date, min_magnitude):
     try:
