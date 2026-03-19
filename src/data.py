@@ -7,6 +7,7 @@ import logging
 import os
 import pandas as pd
 import streamlit as st
+from concurrent.futures import ThreadPoolExecutor
 from data_config import CONFIG
 from data_utils import (
     mag_to_alert_level, extract_country, extract_magnitude, 
@@ -55,14 +56,21 @@ def load_data_with_cache(from_date=None, to_date=None, min_magnitude=None):
 
 def load_data_by_source(from_date=None, to_date=None, min_magnitude=None, source="USGS"):
     selected = (source or "USGS").strip().upper()
-    if selected == "USGS": return _load_usgs_with_cache(from_date, to_date, min_magnitude)
-    if selected == "GDACS": return _load_gdacs_with_cache(from_date, to_date, min_magnitude)
+    if selected == "USGS":
+        return _load_usgs_with_cache(from_date, to_date, min_magnitude)
+    if selected == "GDACS":
+        return _load_gdacs_with_cache(from_date, to_date, min_magnitude)
     if selected == "BOTH":
-        u_df, u_w = _load_usgs_with_cache(from_date, to_date, min_magnitude)
-        g_df, g_w = _load_gdacs_with_cache(from_date, to_date, min_magnitude)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_usgs = executor.submit(_load_usgs_with_cache, from_date, to_date, min_magnitude)
+            future_gdacs = executor.submit(_load_gdacs_with_cache, from_date, to_date, min_magnitude)
+            u_df, u_w = future_usgs.result()
+            g_df, g_w = future_gdacs.result()
+        
         frames = [f for f in [u_df, g_df] if f is not None and not f.empty]
         merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-        if not merged.empty: merged = normalize_schema(merged).sort_values("main_time")
+        if not merged.empty:
+            merged = normalize_schema(merged).sort_values("main_time")
         warns = [w for w in [u_w, g_w] if w]
         return merged, " | ".join(warns) if warns else None
     return pd.DataFrame(), f"⚠️ Unknown source: {source}"
@@ -74,7 +82,8 @@ def _load_usgs_with_cache(from_date, to_date, min_magnitude):
         try:
             xml = fetch_usgs_xml(from_date, to_date, min_magnitude)
             usgs_provider.save_raw_xml(xml, CONFIG["xml_output_file"])
-        except Exception as e: logger.warning("USGS XML error: %s", e)
+        except Exception as e:
+            logger.warning("USGS XML error: %s", e)
         df.to_csv(CONFIG["cache_file"], index=False)
         return df, None
     except Exception as e:
