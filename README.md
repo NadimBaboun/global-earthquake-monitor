@@ -1,4 +1,5 @@
 # Global Earthquake Monitor — Live Dashboard
+[![CI](https://github.com/NadimBaboun/global-earthquake-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/NadimBaboun/global-earthquake-monitor/actions/workflows/ci.yml)
 
 A real-time **data science dashboard** built with **Streamlit** that monitors global earthquake activity using the **USGS Earthquake Catalog API**.
 
@@ -155,7 +156,11 @@ Output formats: **QuakeML (XML)**, GeoJSON, CSV, KML, Text
 
 ## 📝 License
 
-This project is for educational and portfolio purposes.
+This project currently does **not** include a separate `LICENSE` file.
+
+Unless stated otherwise by the author, all rights are reserved.
+If you want to reuse or redistribute any part of this repository, please
+contact the author first for permission.
 
 ---
 

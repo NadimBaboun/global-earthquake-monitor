@@ -9,6 +9,7 @@ caches results to CSV so the dashboard stays usable during network outages.
 import logging
 import os
 import re
+import tempfile
 import xml.etree.ElementTree as ET
 from typing import Any, cast
 
@@ -24,8 +25,6 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────
-import tempfile
-
 _tmp = tempfile.gettempdir()
 
 CONFIG = {
@@ -38,21 +37,6 @@ CONFIG = {
     "xml_output_file": os.path.join(_tmp, "earthquakes.xml"),
     "gdacs_xml_output_file": os.path.join(_tmp, "GDACS_data.xml"),
     "cache_ttl": 600,
-
-    # UI defaults
-    "default_days_back": 30,
-    "map_points_min": 20,
-    "map_points_max": 500,
-    "map_points_default": 200,
-    "histogram_bins": 20,
-
-    # Chart sizing
-    "chart_height_small": 369,
-    "chart_height_medium": 500,
-    "sidebar_table_height": 387,
-    "figsize_standard": (10, 5),
-    "figsize_square": (6, 6),
-    "figsize_wide": (10, 4),
 }
 CACHE_TTL = cast(int, CONFIG["cache_ttl"])
 USGS_API_BASE = cast(str, CONFIG["api_base"])
