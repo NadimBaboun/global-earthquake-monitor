@@ -4,11 +4,8 @@ GDACS data provider for the Global Earthquake Monitor.
 
 import logging
 import requests
-import re
 import xml.etree.ElementTree as ET
 import pandas as pd
-from datetime import datetime, timezone
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
