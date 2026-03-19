@@ -8,6 +8,7 @@ caches results to CSV so the dashboard stays usable during network outages.
 
 import logging
 import os
+import re
 import xml.etree.ElementTree as ET
 
 import pandas as pd
@@ -15,6 +16,7 @@ import requests
 import streamlit as st
 
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +30,12 @@ _tmp = tempfile.gettempdir()
 CONFIG = {
     # USGS Earthquake Catalog API
     "api_base": "https://earthquake.usgs.gov/fdsnws/event/1/query",
+    "gdacs_rss_url": "https://www.gdacs.org/xml/rss.xml",
     "default_min_magnitude": 2.5,
     "cache_file": os.path.join(_tmp, "USGS_cache.csv"),
+    "gdacs_cache_file": os.path.join(_tmp, "GDACS_cache.csv"),
     "xml_output_file": os.path.join(_tmp, "earthquakes.xml"),
+    "gdacs_xml_output_file": os.path.join(_tmp, "GDACS_data.xml"),
     "cache_ttl": 600,
 
     # UI defaults
@@ -74,6 +79,72 @@ def _extract_country(place_str: str) -> str:
     if len(parts) == 2:
         return parts[1].strip()
     return place_str.strip()
+
+
+def _extract_magnitude(text: str):
+    """Extract magnitude like 'M 6.2' or 'Magnitude 6.2' from text."""
+    if not text:
+        return None
+    patterns = [
+        r"\bM\s*([0-9]+(?:\.[0-9]+)?)\b",
+        r"\bMagnitude[:\s]*([0-9]+(?:\.[0-9]+)?)\b",
+    ]
+    for p in patterns:
+        m = re.search(p, text, flags=re.IGNORECASE)
+        if m:
+            try:
+                return float(m.group(1))
+            except ValueError:
+                return None
+    return None
+
+
+def _parse_rfc_datetime(value: str):
+    """Parse RSS pubDate-style timestamps into UTC datetimes."""
+    if not value:
+        return pd.NaT
+    try:
+        dt = parsedate_to_datetime(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return pd.NaT
+
+
+def _normalize_schema(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure both USGS and GDACS data share the same DataFrame schema."""
+    expected = {
+        "title": "",
+        "link": "",
+        "event_type": "Earthquake",
+        "alert_level": "Unknown",
+        "country": "Unknown",
+        "magnitude": None,
+        "magnitude_type": "",
+        "depth_km": None,
+        "latitude": None,
+        "longitude": None,
+        "place": "",
+        "alert_score": None,
+        "tsunami": 0,
+        "felt": None,
+        "status": "",
+        "main_time": pd.NaT,
+        "severity_text": "",
+        "population_text": "",
+        "source": "Unknown",
+    }
+    for col, default_value in expected.items():
+        if col not in df.columns:
+            df[col] = default_value
+
+    df["main_time"] = pd.to_datetime(df["main_time"], utc=True, errors="coerce")
+    df["date_utc"] = df["main_time"].dt.date
+    for col in ["event_type", "alert_level", "country", "source"]:
+        df[col] = df[col].fillna("Unknown")
+
+    return df
 
 
 # ──────────────────────────────────────────────
@@ -193,14 +264,113 @@ def geojson_to_df(data: dict) -> pd.DataFrame:
     if df.empty:
         return df
 
-    df["date_utc"] = df["main_time"].dt.date
+    df["source"] = "USGS"
+    df = _normalize_schema(df)
     df = df.sort_values("main_time", ascending=True)
-
-    # Fill NaN in categorical columns
-    for col in ["event_type", "alert_level", "country"]:
-        df[col] = df[col].fillna("Unknown")
-
     return df
+
+
+@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
+def fetch_gdacs_xml() -> str:
+    """Fetch GDACS earthquake RSS/XML feed."""
+    r = requests.get(CONFIG["gdacs_rss_url"], timeout=30)
+    r.raise_for_status()
+    return r.text
+
+
+def save_gdacs_xml(xml_text: str):
+    """Persist GDACS raw XML for cache/debug usage."""
+    try:
+        with open(CONFIG["gdacs_xml_output_file"], "w", encoding="utf-8") as f:
+            f.write(xml_text)
+    except OSError as e:
+        logger.warning("Could not write GDACS XML file: %s", e)
+
+
+def gdacs_xml_to_df(xml_text: str, from_date: str = None, to_date: str = None, min_magnitude: float = None) -> pd.DataFrame:
+    """Parse GDACS RSS/XML into the same schema used by USGS data."""
+    root = ET.fromstring(xml_text)
+    rows = []
+    ns = {
+        "geo": "http://www.w3.org/2003/01/geo/wgs84_pos#",
+        "gdacs": "http://www.gdacs.org",
+    }
+    start_ts = pd.to_datetime(from_date, utc=True, errors="coerce") if from_date else None
+    end_ts = pd.to_datetime(to_date, utc=True, errors="coerce") if to_date else None
+
+    for item in root.findall(".//item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        desc = (item.findtext("description") or "").strip()
+        pub_date = _parse_rfc_datetime((item.findtext("pubDate") or "").strip())
+        event_type = (item.findtext("gdacs:eventtype", default="Earthquake", namespaces=ns) or "Earthquake").capitalize()
+        country = (item.findtext("gdacs:country", default="", namespaces=ns) or "").strip() or "Unknown"
+        gdacs_alert = (item.findtext("gdacs:alertlevel", default="", namespaces=ns) or "").strip().capitalize()
+        alert_level = gdacs_alert if gdacs_alert in {"Red", "Orange", "Yellow", "Green"} else "Unknown"
+        status = (item.findtext("gdacs:episodealertlevel", default="", namespaces=ns) or "").strip()
+        place = (item.findtext("gdacs:location", default="", namespaces=ns) or "").strip()
+        if not place:
+            place = title
+
+        magnitude = _extract_magnitude(title) or _extract_magnitude(desc)
+        if magnitude is None:
+            mag_text = (item.findtext("gdacs:magnitude", default="", namespaces=ns) or "").strip()
+            try:
+                magnitude = float(mag_text) if mag_text else None
+            except ValueError:
+                magnitude = None
+
+        lat_text = (item.findtext("geo:lat", default="", namespaces=ns) or "").strip()
+        lon_text = (item.findtext("geo:long", default="", namespaces=ns) or "").strip()
+        try:
+            latitude = float(lat_text) if lat_text else None
+        except ValueError:
+            latitude = None
+        try:
+            longitude = float(lon_text) if lon_text else None
+        except ValueError:
+            longitude = None
+
+        if start_ts is not None and pd.notna(pub_date) and pub_date < start_ts:
+            continue
+        if end_ts is not None and pd.notna(pub_date) and pub_date > end_ts + pd.Timedelta(days=1):
+            continue
+        if min_magnitude is not None and magnitude is not None and magnitude < float(min_magnitude):
+            continue
+
+        rows.append({
+            "title": title or place,
+            "link": link,
+            "event_type": event_type,
+            "alert_level": alert_level,
+            "country": country,
+            "magnitude": magnitude,
+            "magnitude_type": "",
+            "depth_km": None,
+            "latitude": latitude,
+            "longitude": longitude,
+            "place": place,
+            "alert_score": None,
+            "tsunami": 0,
+            "felt": None,
+            "status": status,
+            "main_time": pub_date,
+            "severity_text": f"M{magnitude}" if magnitude is not None else "",
+            "population_text": "",
+            "source": "GDACS",
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df = _normalize_schema(df)
+    df = df.sort_values("main_time", ascending=True)
+    return df
+
+
+def _load_cached_frame(path: str) -> pd.DataFrame:
+    cached = pd.read_csv(path, encoding="utf-8")
+    return _normalize_schema(cached)
 
 def load_data_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
     """Fetch USGS earthquake data and cache to CSV. Falls back to cache on failure.
@@ -211,44 +381,77 @@ def load_data_with_cache(from_date: str = None, to_date: str = None, min_magnitu
     to_date       : str   YYYY-MM-DD end date
     min_magnitude : float Minimum magnitude filter
     """
+    return load_data_by_source(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude, source="USGS")
+
+
+def _load_usgs_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
     try:
-        # Fetch GeoJSON for easy DataFrame parsing
         geojson = fetch_usgs_geojson(from_date, to_date, min_magnitude)
         df = geojson_to_df(geojson)
 
-        # Also fetch & save the XML version for XSLT use
         try:
             xml_text = fetch_usgs_xml(from_date, to_date, min_magnitude)
             save_raw_xml(xml_text)
         except Exception as e:
             logger.warning("Could not fetch/save XML: %s", e)
 
-        # Write CSV cache
         try:
             df.to_csv(CONFIG["cache_file"], index=False, encoding="utf-8")
         except OSError as e:
             logger.warning("Could not write cache file: %s", e)
 
         return df, None
-
-    except (requests.RequestException, ValueError, KeyError) as e:
+    except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
         logger.warning("USGS fetch failed: %s", e)
-
         if os.path.exists(CONFIG["cache_file"]):
-            cached = pd.read_csv(CONFIG["cache_file"], encoding="utf-8")
-
-            dt_cols = ["main_time"]
-            for c in dt_cols:
-                if c in cached.columns:
-                    cached[c] = pd.to_datetime(cached[c], utc=True, errors="coerce")
-
-            if "date_utc" in cached.columns:
-                cached["date_utc"] = pd.to_datetime(cached["date_utc"], errors="coerce").dt.date
-
-            for col in ["event_type", "alert_level", "country"]:
-                if col in cached.columns:
-                    cached[col] = cached[col].fillna("Unknown")
-
-            return cached, "⚠️ USGS fetch failed — using cached data."
-
+            return _load_cached_frame(CONFIG["cache_file"]), "⚠️ USGS fetch failed — using cached data."
         return pd.DataFrame(), "⚠️ USGS fetch failed and no cache found."
+
+
+def _load_gdacs_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
+    try:
+        xml_text = fetch_gdacs_xml()
+        save_gdacs_xml(xml_text)
+        df = gdacs_xml_to_df(xml_text, from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
+        try:
+            df.to_csv(CONFIG["gdacs_cache_file"], index=False, encoding="utf-8")
+        except OSError as e:
+            logger.warning("Could not write GDACS cache file: %s", e)
+        return df, None
+    except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
+        logger.warning("GDACS fetch failed: %s", e)
+        if os.path.exists(CONFIG["gdacs_cache_file"]):
+            return _load_cached_frame(CONFIG["gdacs_cache_file"]), "⚠️ GDACS fetch failed — using cached data."
+        return pd.DataFrame(), "⚠️ GDACS fetch failed and no cache found."
+
+
+def load_data_by_source(
+    from_date: str = None,
+    to_date: str = None,
+    min_magnitude: float = None,
+    source: str = "USGS",
+):
+    """Load earthquake data from USGS, GDACS, or both using cache fallbacks."""
+    selected = (source or "USGS").strip().upper()
+
+    if selected == "USGS":
+        return _load_usgs_with_cache(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
+
+    if selected == "GDACS":
+        return _load_gdacs_with_cache(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
+
+    if selected == "BOTH":
+        usgs_df, usgs_warn = _load_usgs_with_cache(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
+        gdacs_df, gdacs_warn = _load_gdacs_with_cache(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
+
+        frames = [f for f in [usgs_df, gdacs_df] if f is not None and not f.empty]
+        if frames:
+            merged = pd.concat(frames, ignore_index=True)
+            merged = _normalize_schema(merged).sort_values("main_time", ascending=True)
+        else:
+            merged = pd.DataFrame()
+
+        warn_msgs = [w for w in [usgs_warn, gdacs_warn] if w]
+        return merged, " | ".join(warn_msgs) if warn_msgs else None
+
+    return pd.DataFrame(), f"⚠️ Unknown data source selection: {source}"

@@ -4,7 +4,7 @@ import streamlit as st
 
 from html import escape
 from datetime import datetime, timezone, timedelta
-from data import CONFIG, load_data_with_cache
+from data import CONFIG, load_data_by_source
 from chart_utils import dark_chart, DARK_FG
 from map_utils import render_earthquake_map
 
@@ -15,6 +15,7 @@ st.title("Global Earthquake Monitor — Live Dashboard")
 
 # Sidebar: date range picker (drives the API query)
 st.sidebar.header("Data Source (UTC)")
+source_label = st.sidebar.radio("Source", ["USGS", "GDACS", "Both"], index=0, horizontal=True)
 
 today_utc = datetime.now(timezone.utc).date()
 default_start = today_utc - timedelta(days=CONFIG["default_days_back"])
@@ -38,7 +39,12 @@ from_str = start_d.strftime("%Y-%m-%d")
 to_str = end_d.strftime("%Y-%m-%d")
 
 with st.spinner("Fetching earthquake data..."):
-    df, warn = load_data_with_cache(from_date=from_str, to_date=to_str, min_magnitude=min_mag)
+    df, warn = load_data_by_source(
+        from_date=from_str,
+        to_date=to_str,
+        min_magnitude=min_mag,
+        source=source_label,
+    )
 if warn:
     st.warning(warn)
 
@@ -48,7 +54,7 @@ if df is None or df.empty:
 
 # XML download button
 xml_path = CONFIG["xml_output_file"]
-if os.path.exists(xml_path):
+if source_label in {"USGS", "Both"} and os.path.exists(xml_path):
     with open(xml_path, "r", encoding="utf-8") as f:
         xml_content = f.read()
     st.sidebar.download_button(
