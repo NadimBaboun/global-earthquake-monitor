@@ -156,7 +156,7 @@ Output formats: **QuakeML (XML)**, GeoJSON, CSV, KML, Text
 
 ## 📝 License
 
-This project currently does **not** include a separate `LICENSE` file.
+This project is licensed. See the `LICENSE` file for details.
 
 Unless stated otherwise by the author, all rights are reserved.
 If you want to reuse or redistribute any part of this repository, please
