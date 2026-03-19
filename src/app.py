@@ -7,6 +7,7 @@ from html import escape
 from datetime import datetime, timezone, timedelta
 from data import CONFIG, load_data_by_source
 from chart_utils import dark_chart, DARK_FG
+from constants import ALERT_HEX_COLORS, DEFAULT_ALERT_HEX
 from map_utils import render_earthquake_map
 
 st.set_page_config(page_title="Global Earthquake Monitor (USGS)", page_icon="🌍", layout="wide")
@@ -182,8 +183,7 @@ with col5:
     alert_counts = filtered["alert_level"].value_counts().sort_values(ascending=False)
 
     with dark_chart(title="Alert level distribution", figsize=CONFIG["figsize_square"], tight=False) as (fig, ax):
-        colors = {"Red": "#ef4444", "Orange": "#f97316", "Yellow": "#f59e0b", "Green": "#22c55e", "Unknown": "#6b7280"}
-        pie_colors = [colors.get(l, "#6b7280") for l in alert_counts.index]
+        pie_colors = [ALERT_HEX_COLORS.get(l, DEFAULT_ALERT_HEX) for l in alert_counts.index]
         ax.pie(
             alert_counts.values,
             labels=alert_counts.index,
@@ -239,7 +239,7 @@ with col8:
         stacked = stacked.loc[top]
         with dark_chart("Alert levels by country", "Country", "Count", rotate_x=True, legend="Alert level") as (fig, ax):
             stacked.plot(kind="bar", stacked=True, ax=ax,
-                         color=[colors.get(c, "#6b7280") for c in stacked.columns])
+                         color=[ALERT_HEX_COLORS.get(c, DEFAULT_ALERT_HEX) for c in stacked.columns])
     else:
         st.info("No data for stacked bar chart.")
 

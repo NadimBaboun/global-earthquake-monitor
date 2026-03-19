@@ -9,16 +9,7 @@ import pydeck as pdk
 import pandas as pd
 import streamlit as st
 
-
-# ── Colour palette (RGBA) keyed by alert level ──
-ALERT_COLORS = {
-    "Red":     [239, 68, 68, 180],
-    "Orange":  [249, 115, 22, 180],
-    "Yellow": [234, 179, 8, 180],
-    "Green":   [34, 197, 94, 180],
-    "Unknown": [107, 114, 128, 150],
-}
-_DEFAULT_COLOR = [107, 114, 128, 150]
+from constants import ALERT_RGBA_COLORS, DEFAULT_ALERT_RGBA
 
 
 def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -26,10 +17,13 @@ def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Colour by alert level — separate RGBA columns for pydeck serialisation
-    df["color_r"] = df["alert_level"].map({"Red": 239, "Orange": 249, "Yellow": 234, "Green": 34, "Unknown": 107}).fillna(107).astype(int)
-    df["color_g"] = df["alert_level"].map({"Red": 68, "Orange": 115, "Yellow": 179, "Green": 197, "Unknown": 114}).fillna(114).astype(int)
-    df["color_b"] = df["alert_level"].map({"Red": 68, "Orange": 22, "Yellow": 8, "Green": 94, "Unknown": 128}).fillna(128).astype(int)
-    df["color_a"] = df["alert_level"].map({"Red": 180, "Orange": 180, "Yellow": 180, "Green": 180, "Unknown": 150}).fillna(150).astype(int)
+    rgba = df["alert_level"].map(ALERT_RGBA_COLORS).apply(
+        lambda c: c if isinstance(c, list) and len(c) == 4 else DEFAULT_ALERT_RGBA
+    )
+    df["color_r"] = rgba.apply(lambda c: c[0]).astype(int)
+    df["color_g"] = rgba.apply(lambda c: c[1]).astype(int)
+    df["color_b"] = rgba.apply(lambda c: c[2]).astype(int)
+    df["color_a"] = rgba.apply(lambda c: c[3]).astype(int)
 
     # Radius scaled by magnitude (min 3 000 m, grows exponentially)
     df["radius"] = df["magnitude"].apply(lambda m: max(3000, 2 ** (m - 1) * 2000))
