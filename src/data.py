@@ -41,10 +41,6 @@ CONFIG = {
 CACHE_TTL = cast(int, CONFIG["cache_ttl"])
 USGS_API_BASE = cast(str, CONFIG["api_base"])
 GDACS_RSS_URL = cast(str, CONFIG["gdacs_rss_url"])
-USGS_CACHE_FILE = cast(str, CONFIG["cache_file"])
-GDACS_CACHE_FILE = cast(str, CONFIG["gdacs_cache_file"])
-USGS_XML_OUTPUT_FILE = cast(str, CONFIG["xml_output_file"])
-GDACS_XML_OUTPUT_FILE = cast(str, CONFIG["gdacs_xml_output_file"])
 DEFAULT_MIN_MAGNITUDE = cast(float, CONFIG["default_min_magnitude"])
 
 # ──────────────────────────────────────────────
@@ -141,6 +137,22 @@ def _normalize_schema(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _usgs_cache_file() -> str:
+    return cast(str, CONFIG["cache_file"])
+
+
+def _gdacs_cache_file() -> str:
+    return cast(str, CONFIG["gdacs_cache_file"])
+
+
+def _usgs_xml_output_file() -> str:
+    return cast(str, CONFIG["xml_output_file"])
+
+
+def _gdacs_xml_output_file() -> str:
+    return cast(str, CONFIG["gdacs_xml_output_file"])
+
+
 # ──────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────
@@ -211,9 +223,10 @@ def save_raw_xml(xml_text: str) -> None:
         else:
             xml_text = PI + "\n" + xml_text
 
-        with open(USGS_XML_OUTPUT_FILE, "w", encoding="utf-8") as f:
+        output_path = _usgs_xml_output_file()
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(xml_text)
-        logger.info("Saved raw XML to %s", USGS_XML_OUTPUT_FILE)
+        logger.info("Saved raw XML to %s", output_path)
     except OSError as e:
         logger.warning("Could not write XML file: %s", e)
 
@@ -279,7 +292,7 @@ def fetch_gdacs_xml() -> str:
 def save_gdacs_xml(xml_text: str) -> None:
     """Persist GDACS raw XML for cache/debug usage."""
     try:
-        with open(GDACS_XML_OUTPUT_FILE, "w", encoding="utf-8") as f:
+        with open(_gdacs_xml_output_file(), "w", encoding="utf-8") as f:
             f.write(xml_text)
     except OSError as e:
         logger.warning("Could not write GDACS XML file: %s", e)
@@ -407,15 +420,16 @@ def _load_usgs_with_cache(
             logger.warning("Could not fetch/save XML: %s", e)
 
         try:
-            df.to_csv(USGS_CACHE_FILE, index=False, encoding="utf-8")
+            df.to_csv(_usgs_cache_file(), index=False, encoding="utf-8")
         except OSError as e:
             logger.warning("Could not write cache file: %s", e)
 
         return df, None
     except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
         logger.warning("USGS fetch failed: %s", e)
-        if os.path.exists(USGS_CACHE_FILE):
-            return _load_cached_frame(USGS_CACHE_FILE), "⚠️ USGS fetch failed — using cached data."
+        cache_file = _usgs_cache_file()
+        if os.path.exists(cache_file):
+            return _load_cached_frame(cache_file), "⚠️ USGS fetch failed — using cached data."
         return pd.DataFrame(), "⚠️ USGS fetch failed and no cache found."
 
 
@@ -429,14 +443,15 @@ def _load_gdacs_with_cache(
         save_gdacs_xml(xml_text)
         df = gdacs_xml_to_df(xml_text, from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
         try:
-            df.to_csv(GDACS_CACHE_FILE, index=False, encoding="utf-8")
+            df.to_csv(_gdacs_cache_file(), index=False, encoding="utf-8")
         except OSError as e:
             logger.warning("Could not write GDACS cache file: %s", e)
         return df, None
     except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
         logger.warning("GDACS fetch failed: %s", e)
-        if os.path.exists(GDACS_CACHE_FILE):
-            return _load_cached_frame(GDACS_CACHE_FILE), "⚠️ GDACS fetch failed — using cached data."
+        cache_file = _gdacs_cache_file()
+        if os.path.exists(cache_file):
+            return _load_cached_frame(cache_file), "⚠️ GDACS fetch failed — using cached data."
         return pd.DataFrame(), "⚠️ GDACS fetch failed and no cache found."
 
 
