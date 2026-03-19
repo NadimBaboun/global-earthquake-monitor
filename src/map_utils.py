@@ -54,7 +54,7 @@ def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def render_earthquake_map(df: pd.DataFrame, max_points: int = 200):
+def render_earthquake_map(df: pd.DataFrame, max_points: int = 200) -> None:
     """
     Render an interactive pydeck earthquake map in Streamlit.
 

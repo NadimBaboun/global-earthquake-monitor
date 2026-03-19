@@ -1,11 +1,15 @@
 from contextlib import contextmanager
+from collections.abc import Generator
+from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import streamlit as st
 
 # ---------- Streamlit render helper ----------
 
-def show_fig(fig):
+def show_fig(fig: Figure) -> None:
     """Render a matplotlib figure in Streamlit and release its memory."""
     st.pyplot(fig, clear_figure=True)
 
@@ -14,7 +18,7 @@ DARK_BG = "#0f172a"
 DARK_FG = "#e5e7eb"
 DARK_GRID = "#334155"
 
-def darken_fig(fig, ax):
+def darken_fig(fig: Figure, ax: Axes) -> None:
     """Apply a consistent dark look to a matplotlib figure/axes."""
     fig.patch.set_facecolor(DARK_BG)
     ax.set_facecolor(DARK_BG)
@@ -27,7 +31,15 @@ def darken_fig(fig, ax):
     ax.grid(True, color=DARK_GRID, alpha=0.35)
 
 @contextmanager
-def dark_chart(title="", xlabel="", ylabel="", figsize=None, legend=None, tight=True, rotate_x=False):
+def dark_chart(
+    title: str = "",
+    xlabel: str = "",
+    ylabel: str = "",
+    figsize: tuple[float, float] | None = None,
+    legend: str | None = None,
+    tight: bool = True,
+    rotate_x: bool = False,
+) -> Generator[tuple[Figure, Axes], Any, None]:
     """
     Context manager for dark-themed matplotlib charts.
 

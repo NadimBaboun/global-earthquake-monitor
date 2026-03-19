@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import xml.etree.ElementTree as ET
+from typing import Any, cast
 
 import pandas as pd
 import requests
@@ -53,20 +54,29 @@ CONFIG = {
     "figsize_square": (6, 6),
     "figsize_wide": (10, 4),
 }
+CACHE_TTL = cast(int, CONFIG["cache_ttl"])
+USGS_API_BASE = cast(str, CONFIG["api_base"])
+GDACS_RSS_URL = cast(str, CONFIG["gdacs_rss_url"])
+USGS_CACHE_FILE = cast(str, CONFIG["cache_file"])
+GDACS_CACHE_FILE = cast(str, CONFIG["gdacs_cache_file"])
+USGS_XML_OUTPUT_FILE = cast(str, CONFIG["xml_output_file"])
+GDACS_XML_OUTPUT_FILE = cast(str, CONFIG["gdacs_xml_output_file"])
+DEFAULT_MIN_MAGNITUDE = cast(float, CONFIG["default_min_magnitude"])
 
 # ──────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────
 
-def _mag_to_alert_level(mag):
+def _mag_to_alert_level(mag: float | int | None) -> str:
     """Derive an alert level from earthquake magnitude for dashboard display."""
-    if pd.isna(mag):
+    if mag is None or pd.isna(mag):
         return "Unknown"
-    if mag >= 7.0:
+    mag_f = float(mag)
+    if mag_f >= 7.0:
         return "Red"
-    if mag >= 5.5:
+    if mag_f >= 5.5:
         return "Orange"
-    if mag >= 4.0:
+    if mag_f >= 4.0:
         return "Yellow"
     return "Green"
 
@@ -81,7 +91,7 @@ def _extract_country(place_str: str) -> str:
     return place_str.strip()
 
 
-def _extract_magnitude(text: str):
+def _extract_magnitude(text: str) -> float | None:
     """Extract magnitude like 'M 6.2' or 'Magnitude 6.2' from text."""
     if not text:
         return None
@@ -99,7 +109,7 @@ def _extract_magnitude(text: str):
     return None
 
 
-def _parse_rfc_datetime(value: str):
+def _parse_rfc_datetime(value: str) -> datetime | pd.Timestamp:
     """Parse RSS pubDate-style timestamps into UTC datetimes."""
     if not value:
         return pd.NaT
@@ -151,8 +161,12 @@ def _normalize_schema(df: pd.DataFrame) -> pd.DataFrame:
 # Public API
 # ──────────────────────────────────────────────
 
-@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
-def fetch_usgs_geojson(from_date: str, to_date: str, min_magnitude: float = None) -> dict:
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_usgs_geojson(
+    from_date: str | None,
+    to_date: str | None,
+    min_magnitude: float | None = None,
+) -> dict[str, Any]:
     """
     Fetch earthquake data from USGS in GeoJSON format.
 
@@ -163,7 +177,7 @@ def fetch_usgs_geojson(from_date: str, to_date: str, min_magnitude: float = None
     min_magnitude : float Minimum magnitude filter (default from CONFIG)
     """
     if min_magnitude is None:
-        min_magnitude = CONFIG["default_min_magnitude"]
+        min_magnitude = DEFAULT_MIN_MAGNITUDE
 
     params = {
         "format": "geojson",
@@ -172,19 +186,19 @@ def fetch_usgs_geojson(from_date: str, to_date: str, min_magnitude: float = None
         "minmagnitude": min_magnitude,
         "orderby": "time",
     }
-    r = requests.get(CONFIG["api_base"], params=params, timeout=30)
+    r = requests.get(USGS_API_BASE, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
 
 
-@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
-def fetch_usgs_xml(from_date: str, to_date: str, min_magnitude: float = None) -> str:
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_usgs_xml(from_date: str | None, to_date: str | None, min_magnitude: float | None = None) -> str:
     """
     Fetch the same earthquake data from USGS in QuakeML XML format.
     This XML file is saved to disk so the user can apply XSLT transformations.
     """
     if min_magnitude is None:
-        min_magnitude = CONFIG["default_min_magnitude"]
+        min_magnitude = DEFAULT_MIN_MAGNITUDE
 
     params = {
         "format": "xml",
@@ -193,11 +207,11 @@ def fetch_usgs_xml(from_date: str, to_date: str, min_magnitude: float = None) ->
         "minmagnitude": min_magnitude,
         "orderby": "time",
     }
-    r = requests.get(CONFIG["api_base"], params=params, timeout=30)
+    r = requests.get(USGS_API_BASE, params=params, timeout=30)
     r.raise_for_status()
     return r.text
 
-def save_raw_xml(xml_text: str):
+def save_raw_xml(xml_text: str) -> None:
     """Save the raw QuakeML XML to disk for XSLT transformation.
 
     Injects an ``xml-stylesheet`` processing instruction so that opening
@@ -213,14 +227,14 @@ def save_raw_xml(xml_text: str):
         else:
             xml_text = PI + "\n" + xml_text
 
-        with open(CONFIG["xml_output_file"], "w", encoding="utf-8") as f:
+        with open(USGS_XML_OUTPUT_FILE, "w", encoding="utf-8") as f:
             f.write(xml_text)
-        logger.info("Saved raw XML to %s", CONFIG["xml_output_file"])
+        logger.info("Saved raw XML to %s", USGS_XML_OUTPUT_FILE)
     except OSError as e:
         logger.warning("Could not write XML file: %s", e)
 
 
-def geojson_to_df(data: dict) -> pd.DataFrame:
+def geojson_to_df(data: dict[str, Any]) -> pd.DataFrame:
     """Convert USGS GeoJSON response into a cleaned DataFrame."""
     features = data.get("features", [])
     rows = []
@@ -270,24 +284,29 @@ def geojson_to_df(data: dict) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=CONFIG["cache_ttl"], show_spinner=False)
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_gdacs_xml() -> str:
     """Fetch GDACS earthquake RSS/XML feed."""
-    r = requests.get(CONFIG["gdacs_rss_url"], timeout=30)
+    r = requests.get(GDACS_RSS_URL, timeout=30)
     r.raise_for_status()
     return r.text
 
 
-def save_gdacs_xml(xml_text: str):
+def save_gdacs_xml(xml_text: str) -> None:
     """Persist GDACS raw XML for cache/debug usage."""
     try:
-        with open(CONFIG["gdacs_xml_output_file"], "w", encoding="utf-8") as f:
+        with open(GDACS_XML_OUTPUT_FILE, "w", encoding="utf-8") as f:
             f.write(xml_text)
     except OSError as e:
         logger.warning("Could not write GDACS XML file: %s", e)
 
 
-def gdacs_xml_to_df(xml_text: str, from_date: str = None, to_date: str = None, min_magnitude: float = None) -> pd.DataFrame:
+def gdacs_xml_to_df(
+    xml_text: str,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    min_magnitude: float | None = None,
+) -> pd.DataFrame:
     """Parse GDACS RSS/XML into the same schema used by USGS data."""
     root = ET.fromstring(xml_text)
     rows = []
@@ -372,7 +391,11 @@ def _load_cached_frame(path: str) -> pd.DataFrame:
     cached = pd.read_csv(path, encoding="utf-8")
     return _normalize_schema(cached)
 
-def load_data_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
+def load_data_with_cache(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    min_magnitude: float | None = None,
+) -> tuple[pd.DataFrame, str | None]:
     """Fetch USGS earthquake data and cache to CSV. Falls back to cache on failure.
 
     Parameters
@@ -384,7 +407,11 @@ def load_data_with_cache(from_date: str = None, to_date: str = None, min_magnitu
     return load_data_by_source(from_date=from_date, to_date=to_date, min_magnitude=min_magnitude, source="USGS")
 
 
-def _load_usgs_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
+def _load_usgs_with_cache(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    min_magnitude: float | None = None,
+) -> tuple[pd.DataFrame, str | None]:
     try:
         geojson = fetch_usgs_geojson(from_date, to_date, min_magnitude)
         df = geojson_to_df(geojson)
@@ -396,41 +423,45 @@ def _load_usgs_with_cache(from_date: str = None, to_date: str = None, min_magnit
             logger.warning("Could not fetch/save XML: %s", e)
 
         try:
-            df.to_csv(CONFIG["cache_file"], index=False, encoding="utf-8")
+            df.to_csv(USGS_CACHE_FILE, index=False, encoding="utf-8")
         except OSError as e:
             logger.warning("Could not write cache file: %s", e)
 
         return df, None
     except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
         logger.warning("USGS fetch failed: %s", e)
-        if os.path.exists(CONFIG["cache_file"]):
-            return _load_cached_frame(CONFIG["cache_file"]), "⚠️ USGS fetch failed — using cached data."
+        if os.path.exists(USGS_CACHE_FILE):
+            return _load_cached_frame(USGS_CACHE_FILE), "⚠️ USGS fetch failed — using cached data."
         return pd.DataFrame(), "⚠️ USGS fetch failed and no cache found."
 
 
-def _load_gdacs_with_cache(from_date: str = None, to_date: str = None, min_magnitude: float = None):
+def _load_gdacs_with_cache(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    min_magnitude: float | None = None,
+) -> tuple[pd.DataFrame, str | None]:
     try:
         xml_text = fetch_gdacs_xml()
         save_gdacs_xml(xml_text)
         df = gdacs_xml_to_df(xml_text, from_date=from_date, to_date=to_date, min_magnitude=min_magnitude)
         try:
-            df.to_csv(CONFIG["gdacs_cache_file"], index=False, encoding="utf-8")
+            df.to_csv(GDACS_CACHE_FILE, index=False, encoding="utf-8")
         except OSError as e:
             logger.warning("Could not write GDACS cache file: %s", e)
         return df, None
     except (requests.RequestException, ValueError, KeyError, ET.ParseError) as e:
         logger.warning("GDACS fetch failed: %s", e)
-        if os.path.exists(CONFIG["gdacs_cache_file"]):
-            return _load_cached_frame(CONFIG["gdacs_cache_file"]), "⚠️ GDACS fetch failed — using cached data."
+        if os.path.exists(GDACS_CACHE_FILE):
+            return _load_cached_frame(GDACS_CACHE_FILE), "⚠️ GDACS fetch failed — using cached data."
         return pd.DataFrame(), "⚠️ GDACS fetch failed and no cache found."
 
 
 def load_data_by_source(
-    from_date: str = None,
-    to_date: str = None,
-    min_magnitude: float = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    min_magnitude: float | None = None,
     source: str = "USGS",
-):
+) -> tuple[pd.DataFrame, str | None]:
     """Load earthquake data from USGS, GDACS, or both using cache fallbacks."""
     selected = (source or "USGS").strip().upper()
 
