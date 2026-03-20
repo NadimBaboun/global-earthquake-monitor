@@ -15,7 +15,9 @@ from ui.tabs import (
     render_timeseries_tab,
 )
 from utils.data_utils import compute_daily_aggregates
+from utils.pdf_report import generate_situation_report
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 st.set_page_config(
@@ -192,6 +194,26 @@ if source_label in {"USGS", "Both"} and os.path.exists(xml_path):
         file_name="earthquakes.xml",
         mime="application/xml",
     )
+
+# PDF Situation Report (instant generation)
+pdf_filters = {
+    "source": source_label,
+    "start_date": start_str,
+    "end_date": end_str,
+    "min_mag": min_mag,
+    "alerts": selected_levels,
+    "countries": selected_countries,
+}
+
+# Streamlit's download_button can take a callable for the `data` arg,
+# which generates the data only when the button is clicked.
+st.sidebar.download_button(
+    label="📄 Download PDF Report",
+    data=lambda: generate_situation_report(filtered, pdf_filters, last_updated_utc),
+    file_name=f"earthquake_report_{start_str}_{end_str}.pdf",
+    mime="application/pdf",
+)
+
 
 # Pre-compute daily aggregates for graphs
 daily_count, daily_avg_mag, daily_energy, cumulative_energy = compute_daily_aggregates(
