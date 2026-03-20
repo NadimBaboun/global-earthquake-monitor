@@ -1,9 +1,6 @@
-# Global Earthquake Monitor — Live Dashboard
-[![CI](https://github.com/nadeemtsf/global-earthquake-monitor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nadeemtsf/global-earthquake-monitor/actions/workflows/ci.yml)
+A high-performance, real-time **data science dashboard** built with **Streamlit** that monitors global earthquake activity by aggregating and normalizing data from multiple sources: **USGS Earthquake Catalog** and **GDACS (Global Disaster Alert and Coordination System)**.
 
-A real-time **data science dashboard** built with **Streamlit** that monitors global earthquake activity using the **USGS Earthquake Catalog API**.
-
-The application fetches earthquake data with user-selectable date ranges (including historical data going back years), exports raw **QuakeML XML** for XSLT transformation, and presents interactive visualizations with filtering capabilities.
+The application uses a **strategy-based provider architecture** to fetch data in parallel, ensures long-term persistence with a **local cache**, and presents interactive, theme-consistent visualizations powered by **Plotly**.
 
 ---
 
@@ -21,124 +18,100 @@ The application fetches earthquake data with user-selectable date ranges (includ
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Recommended: Docker)
 
-### Prerequisites
-- Python 3.8+
+Testing and deploying the application is easiest using **Docker**:
 
-### Installation
-
-1. **Clone the repository**
+1. **Clone and Build**
    ```bash
    git clone https://github.com/NadimBaboun/global-earthquake-monitor.git
    cd global-earthquake-monitor
+   docker-compose up --build
    ```
 
-2. **Install dependencies**
+2. **Access the Dashboard** at `http://localhost:8501`
+
+### Or Run Locally with Python
+
+1. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run the application**
+2. **Run the application**
    ```bash
    streamlit run src/app.py
    ```
-
-4. **Open your browser** to `http://localhost:8501`
 
 ---
 
 ## 📊 Key Features
 
-### Data Pipeline
-- **USGS Earthquake Catalog API** — reliable, free, no API key required
-- **Historical data access** — select any date range (days, months, or years back)
-- **Dual-format fetch** — GeoJSON for dashboard, QuakeML XML for export
-- **Network resilience** — automatic fallback to cached CSV on fetch failures
+### 📡 Multi-Provider Data Pipeline
+- **Parallel Fetching** — Uses `ThreadPoolExecutor` to fetch data from **USGS** and **GDACS** simultaneously, significantly reducing load times.
+- **Provider Architecture** — Modular design (Strategy Pattern) for data providers, making it easy to add new seismic sources.
+- **Historical data access** — Select any date range (days, months, or years back).
+- **Network Resilience** — Automatic fallback to a persistent **local `.cache/` directory** if upstream APIs are unreachable.
 
-### XML Export for XSLT
-- Raw **QuakeML XML** saved to `earthquakes.xml` on every fetch
-- **📥 Download XML** button in the sidebar for one-click export
-- Standard XML format ideal for XSLT transformation into custom presentations
+### 📥 XML Export for XSLT
+- Raw **QuakeML XML** and GDACS XML files are exported on every fetch.
+- **Download XML** buttons in the sidebar for one-click export, ideal for downstream XSLT transformation pipelines.
 
-### Data Processing
-- GeoJSON parsing with automatic field extraction
-- Magnitude-based alert level classification (🔴 ≥7.0, 🟠 ≥5.5, 🟢 ≥4.0)
-- Country/region extraction from USGS place strings
-- USGS significance score mapping for severity ranking
+### 🧩 Data Science & Processing
+- **Schema Normalization** — Consistent data schema across differing providers (GeoJSON vs RSS/XML).
+- **Alert Classification** — Standardized alert level logic (🔴 ≥7.0, 🟠 ≥5.5, 🟡 ≥4.5).
+- **Region Extraction** — Automated parsing of country and region tags from unstructured location strings.
+- **Tsunami Flags** — Integrated warnings and specialized map styling for tsunami-prone events.
 
-### Interactive Dashboard
-- **Date range picker** — drives the API query for historical or recent data
-- **Magnitude slider** — filter earthquakes by minimum magnitude (1.0–8.0)
-- **Multi-filter system** — alert level, country/region
-- **KPI sidebar** — earthquake count, average/max magnitude
-- **10+ chart types** — line, bar, pie, histogram, boxplot, scatter, stacked bar, geographic map
-- **Dark-themed UI** — custom matplotlib styling for readability
+### 📈 Interactive Dashboard
+- **Plotly Visualizations** — 100% interactive charts (Bar, Pie, Boxplot, Scatter, Line) with custom hover tooltips and consistent dark-theme styling.
+- **Dynamic Map (Pydeck)** — High-performance scatterplot map with radius scaling and alert-level color coding.
+- **Real-time Filters** — Instantly filter by date, magnitude, region, and alert level.
 
 ---
 
 ## 🗂️ Project Structure
 
-```
+```text
 📁 global-earthquake-monitor/
 ├── src/                  # Python source code
-│   ├── app.py            # Streamlit UI (filters, charts, layout)
-│   ├── data.py           # Data layer (USGS fetch, parse, cache, XML export)
-│   └── chart_utils.py    # Dark-themed chart helpers
-├── xml/                  # XML / XSLT files
-│   ├── quakeml_to_map.xsl  # XSLT transformation → interactive Leaflet map
-│   └── testing.xml         # Sample QuakeML event for reference
-├── assets/               # Screenshots and media
-├── requirements.txt      # Python dependencies
-├── .gitignore            # Excluded files (cache, bytecode, etc.)
+│   ├── providers/        # [NEW] Data provider implementations (USGS, GDACS)
+│   ├── app.py            # Streamlit UI Entry Point
+│   ├── components.py     # [NEW] Reusable UI components (CSS, Tables)
+│   ├── data.py           # Core data orchestrator (Parallel fetching, Cache)
+│   ├── data_utils.py     # Schema mapping & cleaning
+│   ├── map_utils.py      # Pydeck mapping & styling
+│   └── chart_utils.py    # Plotly theme & template configuration
+├── tests/                # [NEW] Pytest suite covering GDACS, Map Utils, and Core Data
+├── docs/                 # Documentation & architectural diagrams
+├── xml/                  # XSLT transformation files
+├── .cache/               # Local persistent cache (ignored by git)
+├── Dockerfile            # [NEW] Container configuration
+├── docker-compose.yml    # [NEW] Orchestration & Volume setup
+├── requirements.txt      # Project dependencies
 └── README.md
 ```
 
-### Code Organization
-
-| File | Responsibility | Key Functions |
-|---|---|---|
-| **`src/data.py`** | USGS API fetching & caching | `fetch_usgs_geojson()`, `fetch_usgs_xml()`, `geojson_to_df()`, `load_data_with_cache()` |
-| **`src/chart_utils.py`** | Chart styling | `dark_chart()` context manager, `darken_fig()` |
-| **`src/app.py`** | UI layout & filters | Date range picker, magnitude slider, chart rendering, XML download |
-| **`xml/quakeml_to_map.xsl`** | XSLT transformation | Transforms QuakeML XML into interactive Leaflet map HTML |
-
 ---
 
-## 🌐 Data Source
+## 🌐 Data Sources
 
-**USGS Earthquake Hazards Program — Earthquake Catalog API**  
-📍 [https://earthquake.usgs.gov/fdsnws/event/1/](https://earthquake.usgs.gov/fdsnws/event/1/)
-
-The API provides comprehensive earthquake data including:
-- 🌍 **Magnitude & type** (Mw, Mb, Ml, etc.)
-- 📏 **Depth** (km below surface)
-- 📍 **Precise location** (latitude, longitude, place name)
-- 🌊 **Tsunami flag** — whether a tsunami advisory was issued
-- 👥 **Felt reports** — number of people who reported feeling the earthquake
-- 📊 **Significance score** — composite severity metric (0–1000+)
-
-Output formats: **QuakeML (XML)**, GeoJSON, CSV, KML, Text
+1. **USGS Earthquake Catalog** — [fdsnws/event/1/](https://earthquake.usgs.gov/fdsnws/event/1/) (GeoJSON/QuakeML)
+2. **GDACS RSS Feed** — [Global Disaster Alert System](https://www.gdacs.org/) (RSS/XML)
 
 ---
 
 ## 🛠️ Technical Highlights
 
-### Error Handling
-- **Specific exception catching**: `requests.RequestException`, `ValueError`, `KeyError`
-- **Logging integration**: Failed fetches are logged for debugging on Streamlit Cloud
-- **Cache write isolation**: Disk errors don't prevent showing fresh data
-- **XML fetch isolation**: XML export failure doesn't block dashboard rendering
+### Performance & Scalability
+- **Multithreading**: Parallelizing API requests for a more responsive user experience.
+- **Dockerization**: Consistent development environment using `python:3.11-slim`.
+- **Streamlit Caching**: Optimized `@st.cache_data` decorators to minimize redundant processing.
 
-### Performance
-- **Streamlit caching**: `@st.cache_data(ttl=600)` for API fetches
-- **Pre-computed aggregates**: Daily counts/magnitudes computed once and reused
-- **Efficient filtering**: Single boolean mask for all sidebar selections
-
-### Code Quality
-- **Separation of concerns**: Data layer, UI layer, chart utilities in separate modules
-- **Comprehensive docstrings**: All public functions documented
-- **Inline comments**: Explain *why*, not *what*
+### Quality Assurance
+- **Linting**: Enforced code quality with `ruff`.
+- **Testing**: Comprehensive `pytest` suite for core utilities and data parsers.
+- **Persistence**: Decoupled cache from system temp to ensure network resilience across reboots.
 
 ---
 
