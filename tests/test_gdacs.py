@@ -6,7 +6,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from providers import gdacs_provider
-from data_utils import extract_magnitude, parse_rfc_datetime
+from utils.data_utils import extract_magnitude, parse_rfc_datetime
+
 
 @pytest.fixture
 def sample_gdacs_xml():
@@ -41,13 +42,19 @@ def sample_gdacs_xml():
 </rss>
 """
 
+
 def test_gdacs_xml_to_df_extracts_correct_fields(sample_gdacs_xml):
     df = gdacs_provider.gdacs_xml_to_df(
-        sample_gdacs_xml, None, None, None, extract_magnitude, parse_rfc_datetime
+        sample_gdacs_xml,
+        start_date=None,
+        end_date=None,
+        min_mag=None,
+        extract_mag_fn=extract_magnitude,
+        parse_dt_fn=parse_rfc_datetime,
     )
-    
+
     assert len(df) == 2
-    
+
     # Check first item (magnitude in title)
     row1 = df[df["country"] == "Japan"].iloc[0]
     assert row1["magnitude"] == 6.8
@@ -62,21 +69,33 @@ def test_gdacs_xml_to_df_extracts_correct_fields(sample_gdacs_xml):
     assert row2["alert_level"] == "Green"
     assert row2["source"] == "GDACS"
 
+
 def test_gdacs_xml_to_df_filtering(sample_gdacs_xml):
     # Filter by date
     from_date = "2024-03-15T12:30:00Z"
     df = gdacs_provider.gdacs_xml_to_df(
-        sample_gdacs_xml, from_date, None, None, extract_magnitude, parse_rfc_datetime
+        sample_gdacs_xml,
+        start_date=from_date,
+        end_date=None,
+        min_mag=None,
+        extract_mag_fn=extract_magnitude,
+        parse_dt_fn=parse_rfc_datetime,
     )
     assert len(df) == 1
     assert df.iloc[0]["country"] == "Testland"
 
     # Filter by magnitude
     df_mag = gdacs_provider.gdacs_xml_to_df(
-        sample_gdacs_xml, None, None, 6.0, extract_magnitude, parse_rfc_datetime
+        sample_gdacs_xml,
+        start_date=None,
+        end_date=None,
+        min_mag=6.0,
+        extract_mag_fn=extract_magnitude,
+        parse_dt_fn=parse_rfc_datetime,
     )
     assert len(df_mag) == 1
     assert df_mag.iloc[0]["country"] == "Japan"
+
 
 def test_gdacs_xml_to_df_malformed_coords():
     malformed_xml = """<?xml version="1.0" encoding="utf-8"?>
@@ -91,7 +110,12 @@ def test_gdacs_xml_to_df_malformed_coords():
 </rss>
 """
     df = gdacs_provider.gdacs_xml_to_df(
-        malformed_xml, None, None, None, extract_magnitude, parse_rfc_datetime
+        malformed_xml,
+        start_date=None,
+        end_date=None,
+        min_mag=None,
+        extract_mag_fn=extract_magnitude,
+        parse_dt_fn=parse_rfc_datetime,
     )
     assert len(df) == 1
     assert df.iloc[0]["latitude"] is None

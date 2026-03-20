@@ -17,8 +17,12 @@ def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Colour by alert level — separate RGBA columns for pydeck serialisation
-    rgba = df["alert_level"].map(ALERT_RGBA_COLORS).apply(
-        lambda c: c if isinstance(c, list) and len(c) == 4 else DEFAULT_ALERT_RGBA
+    rgba = (
+        df["alert_level"]
+        .map(ALERT_RGBA_COLORS)
+        .apply(
+            lambda c: c if isinstance(c, list) and len(c) == 4 else DEFAULT_ALERT_RGBA
+        )
     )
     df["color_r"] = rgba.apply(lambda c: c[0]).astype(int)
     df["color_g"] = rgba.apply(lambda c: c[1]).astype(int)
@@ -30,7 +34,9 @@ def _prepare_map_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # Highlight tsunami advisories with a brighter border and thicker stroke
     if "tsunami" in df.columns:
-        df["tsunami"] = pd.to_numeric(df["tsunami"], errors="coerce").fillna(0).astype(int)
+        df["tsunami"] = (
+            pd.to_numeric(df["tsunami"], errors="coerce").fillna(0).astype(int)
+        )
     else:
         df["tsunami"] = 0
     df["line_r"] = df["tsunami"].apply(lambda t: 56 if t == 1 else 255).astype(int)
@@ -72,24 +78,48 @@ def render_earthquake_map(df: pd.DataFrame, max_points: int = 200) -> None:
     map_df = _prepare_map_data(map_df)
 
     # Select only necessary columns and convert to native Python types to avoid JSON serialization errors
-    map_data = map_df[[
-        "latitude", "longitude", "radius",
-        "color_r", "color_g", "color_b", "color_a",
-        "line_r", "line_g", "line_b", "line_a", "line_width",
-        "place", "mag_display", "depth_display", "time_str",
-        "country", "alert_level", "tsunami_display"
-    ]].copy()
+    map_data = map_df[
+        [
+            "latitude",
+            "longitude",
+            "radius",
+            "color_r",
+            "color_g",
+            "color_b",
+            "color_a",
+            "line_r",
+            "line_g",
+            "line_b",
+            "line_a",
+            "line_width",
+            "place",
+            "mag_display",
+            "depth_display",
+            "time_str",
+            "country",
+            "alert_level",
+            "tsunami_display",
+        ]
+    ].copy()
 
     # Ensure native types (float, int, str) - pandas often keeps numpy types even in to_dict
     for col in ["latitude", "longitude", "radius"]:
         map_data[col] = map_data[col].astype(float)
-    
+
     for col in ["color_r", "color_g", "color_b", "color_a"]:
         map_data[col] = map_data[col].astype(int)
     for col in ["line_r", "line_g", "line_b", "line_a", "line_width"]:
         map_data[col] = map_data[col].astype(int)
 
-    for col in ["place", "mag_display", "depth_display", "time_str", "country", "alert_level", "tsunami_display"]:
+    for col in [
+        "place",
+        "mag_display",
+        "depth_display",
+        "time_str",
+        "country",
+        "alert_level",
+        "tsunami_display",
+    ]:
         map_data[col] = map_data[col].astype(str)
 
     # Convert to list of dicts for pydeck
@@ -141,9 +171,11 @@ def render_earthquake_map(df: pd.DataFrame, max_points: int = 200) -> None:
         },
     }
 
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        tooltip=tooltip,
-        map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-    ))
+    st.pydeck_chart(
+        pdk.Deck(
+            layers=[layer],
+            initial_view_state=view_state,
+            tooltip=tooltip,
+            map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        )
+    )

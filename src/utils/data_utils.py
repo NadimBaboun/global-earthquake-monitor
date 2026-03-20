@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
+
 def mag_to_alert_level(mag: float | int | None) -> str:
     """Derive an alert level from earthquake magnitude."""
     if mag is None or pd.isna(mag):
@@ -20,6 +21,7 @@ def mag_to_alert_level(mag: float | int | None) -> str:
         return "Yellow"
     return "Green"
 
+
 def extract_country(place_str: str) -> str:
     """Extract country/region from a USGS place string."""
     if not place_str:
@@ -27,9 +29,13 @@ def extract_country(place_str: str) -> str:
     parts = place_str.rsplit(",", 1)
     return parts[1].strip() if len(parts) == 2 else place_str.strip()
 
+
 def extract_magnitude(text: str) -> float | None:
     """Extract magnitude from text using regex."""
-    patterns = [r"\bM\s*([0-9]+(?:\.[0-9]+)?)\b", r"\bMagnitude[:\s]*([0-9]+(?:\.[0-9]+)?)\b"]
+    patterns = [
+        r"\bM\s*([0-9]+(?:\.[0-9]+)?)\b",
+        r"\bMagnitude[:\s]*([0-9]+(?:\.[0-9]+)?)\b",
+    ]
     for p in patterns:
         m = re.search(p, text, flags=re.IGNORECASE)
         if m:
@@ -38,6 +44,7 @@ def extract_magnitude(text: str) -> float | None:
             except ValueError:
                 continue
     return None
+
 
 def parse_rfc_datetime(value: str) -> datetime | pd.Timestamp:
     """Parse RSS pubDate-style timestamps."""
@@ -51,28 +58,68 @@ def parse_rfc_datetime(value: str) -> datetime | pd.Timestamp:
     except (TypeError, ValueError):
         return pd.NaT
 
+
 def normalize_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure consistent DataFrame schema across all providers."""
     expected = {
-        "title": "", "link": "", "event_type": "Earthquake", "alert_level": "Unknown",
-        "country": "Unknown", "magnitude": None, "magnitude_type": "", "depth_km": None,
-        "latitude": None, "longitude": None, "place": "", "alert_score": None,
-        "tsunami": 0, "felt": None, "status": "", "main_time": pd.NaT,
-        "severity_text": "", "population_text": "", "source": "Unknown",
+        "title": "",
+        "link": "",
+        "event_type": "Earthquake",
+        "alert_level": "Unknown",
+        "country": "Unknown",
+        "magnitude": None,
+        "magnitude_type": "",
+        "depth_km": None,
+        "latitude": None,
+        "longitude": None,
+        "place": "",
+        "alert_score": None,
+        "tsunami": 0,
+        "felt": None,
+        "status": "",
+        "main_time": pd.NaT,
+        "severity_text": "",
+        "population_text": "",
+        "source": "Unknown",
     }
     for col, default_value in expected.items():
         if col not in df.columns:
             df[col] = default_value
-            
-    # Explicitly casting key columns to avoid dtype inference ambiguity 
+
+    # Explicitly casting key columns to avoid dtype inference ambiguity
     # (Fixes Pandas FuturesWarnings about all-NA columns during concat)
-    numeric_cols = ["magnitude", "depth_km", "latitude", "longitude", "alert_score", "felt"]
+    numeric_cols = [
+        "magnitude",
+        "depth_km",
+        "latitude",
+        "longitude",
+        "alert_score",
+        "felt",
+    ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
-            
+
     df["main_time"] = pd.to_datetime(df["main_time"], utc=True, errors="coerce")
     df["date_utc"] = df["main_time"].dt.date
     for col in ["event_type", "alert_level", "country", "source"]:
         df[col] = df[col].fillna("Unknown").astype(str)
     return df
+
+
+def compute_daily_aggregates(df: pd.DataFrame):
+    """Compute frequency and intensity trends over time."""
+    if df.empty:
+        return pd.Series(), pd.Series(), pd.Series(), pd.Series()
+
+    # Calculate individual energy for each quake: E = 10^(1.5 * M)
+    # Note: 4.8 is the constant for Joules, but 1.5*M is the scaling factor
+    df = df.copy()
+    df["energy"] = 10 ** (1.5 * df["magnitude"].fillna(0))
+
+    daily_count = df.groupby("date_utc").size()
+    daily_avg_mag = df.groupby("date_utc")["magnitude"].mean()
+    daily_energy = df.groupby("date_utc")["energy"].sum()
+    cumulative_energy = daily_energy.cumsum()
+
+    return daily_count, daily_avg_mag, daily_energy, cumulative_energy

@@ -8,6 +8,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import data  # noqa: E402
+from utils import data_utils  # noqa: E402
 
 
 @pytest.fixture
@@ -54,37 +55,42 @@ def sample_geojson():
 
 
 def test_mag_to_alert_level_red():
-    assert data._mag_to_alert_level(7.2) == "Red"
+    assert data_utils.mag_to_alert_level(7.2) == "Red"
 
 
 def test_mag_to_alert_level_orange():
-    assert data._mag_to_alert_level(5.6) == "Orange"
+    assert data_utils.mag_to_alert_level(5.6) == "Orange"
 
 
 def test_mag_to_alert_level_yellow():
-    assert data._mag_to_alert_level(4.2) == "Yellow"
+    assert data_utils.mag_to_alert_level(4.2) == "Yellow"
 
 
 def test_mag_to_alert_level_green():
-    assert data._mag_to_alert_level(3.9) == "Green"
+    assert data_utils.mag_to_alert_level(3.9) == "Green"
 
 
 def test_mag_to_alert_level_unknown_on_nan():
-    assert data._mag_to_alert_level(float("nan")) == "Unknown"
+    assert data_utils.mag_to_alert_level(float("nan")) == "Unknown"
 
 
 def test_extract_country_with_comma():
-    assert data._extract_country("7 km E of Lakatoro, Vanuatu") == "Vanuatu"
+    assert data_utils.extract_country("7 km E of Lakatoro, Vanuatu") == "Vanuatu"
 
 
 def test_extract_country_without_comma():
-    assert data._extract_country("Northern Mid-Atlantic Ridge") == "Northern Mid-Atlantic Ridge"
+    assert (
+        data_utils.extract_country("Northern Mid-Atlantic Ridge")
+        == "Northern Mid-Atlantic Ridge"
+    )
 
 
 def test_geojson_to_df_maps_expected_fields(sample_geojson):
     df = data.geojson_to_df(sample_geojson)
     assert len(df) == 2
-    assert set(["place", "magnitude", "depth_km", "latitude", "longitude", "link"]).issubset(df.columns)
+    assert set(
+        ["place", "magnitude", "depth_km", "latitude", "longitude", "link"]
+    ).issubset(df.columns)
     assert df["source"].eq("USGS").all()
 
 
@@ -136,7 +142,9 @@ def test_load_data_with_cache_falls_back_to_cached_csv(monkeypatch, tmp_path):
 
     monkeypatch.setattr(data, "fetch_usgs_geojson", raise_request_error)
 
-    df, warn = data.load_data_with_cache("2025-01-01", "2025-01-02", 2.5)
+    df, warn = data.load_data_by_source(
+        start_date="2025-01-01", end_date="2025-01-02", min_mag=2.5
+    )
     assert not df.empty
     assert "using cached data" in (warn or "").lower()
     assert "source" in df.columns
@@ -153,10 +161,16 @@ def test_geojson_to_df_empty_features():
 
 def test_geojson_to_df_missing_properties():
     minimal_data = {
-        "features": [{
-            "properties": {"mag": 5.0, "place": "Test Place", "time": 1700000000000},
-            "geometry": {"coordinates": [0, 0]}
-        }]
+        "features": [
+            {
+                "properties": {
+                    "mag": 5.0,
+                    "place": "Test Place",
+                    "time": 1700000000000,
+                },
+                "geometry": {"coordinates": [0, 0]},
+            }
+        ]
     }
     df = data.geojson_to_df(minimal_data)
     assert len(df) == 1
@@ -167,7 +181,9 @@ def test_geojson_to_df_missing_properties():
 
 def test_load_data_by_source_both_partial_failure(monkeypatch):
     def mock_usgs(*args, **kwargs):
-        return pd.DataFrame([{"magnitude": 5.0, "source": "USGS", "main_time": pd.to_datetime("now")}]), None
+        return pd.DataFrame(
+            [{"magnitude": 5.0, "source": "USGS", "main_time": pd.to_datetime("now")}]
+        ), None
 
     def mock_gdacs(*args, **kwargs):
         return pd.DataFrame(), "⚠️ GDACS fetch failed"

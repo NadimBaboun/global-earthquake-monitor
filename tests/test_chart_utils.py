@@ -5,15 +5,17 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import chart_utils  # noqa: E402
+from utils import chart_utils  # noqa: E402
+
 
 def test_apply_plotly_theme_sets_background():
     fig = go.Figure()
     chart_utils.apply_plotly_theme(fig)
-    
+
     assert fig.layout.paper_bgcolor == chart_utils.DARK_BG
     assert fig.layout.plot_bgcolor == chart_utils.DARK_BG
     assert fig.layout.font.color == chart_utils.DARK_FG
+
 
 def test_render_plotly_chart_calls_streamlit(monkeypatch):
     called = {"count": 0}

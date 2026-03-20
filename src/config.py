@@ -7,7 +7,6 @@ UI_CONFIG = {
     "map_points_max": 500,
     "map_points_default": 200,
     "histogram_bins": 20,
-
     # Chart sizing
     "chart_height_small": 369,
     "chart_height_medium": 500,
