@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 import re
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
 
 from constants import ALERT_HEX_COLORS
 from utils.chart_utils import render_plotly_chart
+
+logger = logging.getLogger(__name__)
 
 
 def build_ai_chart(chart_spec: dict, base_df: pd.DataFrame) -> go.Figure | None:
