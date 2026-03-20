@@ -15,7 +15,6 @@ def inject_custom_css():
     [data-testid="stSidebar"] [data-testid="stMetricLabel"] { font-size: 0.75rem; }
     [data-testid="stSidebar"] [data-testid="stMetric"] { padding: 4px 0; }
     
-    /* Significant earthquakes table styling */
     .sig-table-wrap { overflow-x: auto; margin-bottom: 0.25rem; }
     .sig-table {
         width: 100%;

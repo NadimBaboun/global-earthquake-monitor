@@ -57,6 +57,7 @@ def gdacs_xml_to_df(xml_text, from_date=None, to_date=None, min_magnitude=None):
 def load_data_with_cache(from_date=None, to_date=None, min_magnitude=None):
     return load_data_by_source(from_date, to_date, min_magnitude, source="USGS")
 
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Fetching latest earthquake data...")
 def load_data_by_source(from_date=None, to_date=None, min_magnitude=None, source="USGS"):
     selected = (source or "USGS").strip().upper()
     if selected == "USGS":

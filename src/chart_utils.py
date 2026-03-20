@@ -59,4 +59,4 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
 def render_plotly_chart(fig: go.Figure, key: str | None = None) -> None:
     """Apply theme and render the plotly chart in Streamlit."""
     apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True, key=key, theme=None)
+    st.plotly_chart(fig, width='stretch', key=key, theme=None)
