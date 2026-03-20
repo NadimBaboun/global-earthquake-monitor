@@ -76,7 +76,6 @@ class SeismicAI:
 
         total = len(df)
         avg_mag = df["magnitude"].mean()
-        max_row = df.loc[df["magnitude"].idxmax()]
         tsunami_count = int((df["tsunami"] == 1).sum()) if "tsunami" in df.columns else 0
 
         # Alert distribution
