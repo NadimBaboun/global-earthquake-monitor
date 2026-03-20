@@ -22,3 +22,16 @@ ALERT_RGBA_COLORS: Final[dict[str, list[int]]] = {
 
 DEFAULT_ALERT_HEX: Final[str] = ALERT_HEX_COLORS["Unknown"]
 DEFAULT_ALERT_RGBA: Final[list[int]] = ALERT_RGBA_COLORS["Unknown"]
+
+# General categorical palette for Plotly charts (based on the dashboard's blue theme)
+PLOTLY_THEME_COLORS: Final[list[str]] = [
+    "#3b82f6",  # Blue 500
+    "#10b981",  # Emerald 500
+    "#f59e0b",  # Amber 500
+    "#ef4444",  # Red 500
+    "#8b5cf6",  # Violet 500
+    "#06b6d4",  # Cyan 500
+    "#f472b6",  # Pink 400
+]
+
+PLOTLY_FONT: Final[str] = "Inter, sans-serif"

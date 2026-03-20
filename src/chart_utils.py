@@ -1,88 +1,62 @@
-from contextlib import contextmanager
-from collections.abc import Generator
-from typing import Any
 
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+import plotly.graph_objects as go
 import streamlit as st
+from constants import PLOTLY_THEME_COLORS, PLOTLY_FONT
 
-# ---------- Streamlit render helper ----------
+# ---------- Plotly Dark Theme Configuration ----------
 
-def show_fig(fig: Figure) -> None:
-    """Render a matplotlib figure in Streamlit and release its memory."""
-    st.pyplot(fig, clear_figure=True)
-
-# ---------- Matplotlib dark theme helpers ----------
 DARK_BG = "#0f172a"
 DARK_FG = "#e5e7eb"
 DARK_GRID = "#334155"
 
-def darken_fig(fig: Figure, ax: Axes) -> None:
-    """Apply a consistent dark look to a matplotlib figure/axes."""
-    fig.patch.set_facecolor(DARK_BG)
-    ax.set_facecolor(DARK_BG)
-    ax.tick_params(colors=DARK_FG)
-    for spine in ax.spines.values():
-        spine.set_color(DARK_FG)
-    ax.xaxis.label.set_color(DARK_FG)
-    ax.yaxis.label.set_color(DARK_FG)
-    ax.title.set_color(DARK_FG)
-    ax.grid(True, color=DARK_GRID, alpha=0.35)
-
-@contextmanager
-def dark_chart(
-    title: str = "",
-    xlabel: str = "",
-    ylabel: str = "",
-    figsize: tuple[float, float] | None = None,
-    legend: str | None = None,
-    tight: bool = True,
-    rotate_x: bool = False,
-) -> Generator[tuple[Figure, Axes], Any, None]:
+def apply_plotly_theme(fig: go.Figure) -> go.Figure:
     """
-    Context manager for dark-themed matplotlib charts.
-
-    Yields (fig, ax). On exit it applies the dark theme, optional legend styling,
-    tight_layout, and renders via show_fig.
-
-    Parameters
-    ----------
-    title    : str   chart title
-    xlabel   : str   x-axis label
-    ylabel   : str   y-axis label
-    figsize  : tuple figure size, defaults to (10, 5)
-    legend   : str | None if set, adds a legend with this as the title
-                            (pass "" for a legend with no title)
-    tight    : bool  call tight_layout before rendering
-    rotate_x : bool  rotate x-tick labels 45°
+    Apply a consistent dark theme, font, and grid layout to a Plotly figure.
     """
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor=DARK_BG,
+        plot_bgcolor=DARK_BG,
+        font=dict(family=PLOTLY_FONT, color=DARK_FG, size=12),
+        margin=dict(l=40, r=40, t=60, b=40),
+        legend=dict(
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=11),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
+        hoverlabel=dict(
+            bgcolor="#1e293b",
+            font_size=13,
+            font_family=PLOTLY_FONT,
+        ),
+        colorway=PLOTLY_THEME_COLORS,
+    )
     
-    if figsize is None:
-        figsize = (10, 5)
+    # Grid and axis styling
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor=DARK_GRID,
+        gridwidth=1,
+        zeroline=False,
+        tickfont=dict(color="#94a3b8"),
+        title_font=dict(size=13, color=DARK_FG),
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor=DARK_GRID,
+        gridwidth=1,
+        zeroline=False,
+        tickfont=dict(color="#94a3b8"),
+        title_font=dict(size=13, color=DARK_FG),
+    )
+    
+    return fig
 
-    with plt.style.context("dark_background"):
-        fig, ax = plt.subplots(figsize=figsize)
-        yield fig, ax
-
-        if title:
-            ax.set_title(title)
-        if xlabel:
-            ax.set_xlabel(xlabel)
-        if ylabel:
-            ax.set_ylabel(ylabel)
-        if rotate_x:
-            plt.setp(ax.get_xticklabels(), rotation=45, ha="right", color=DARK_FG)
-        if legend is not None:
-            leg = ax.legend(
-                **({"title": legend, "bbox_to_anchor": (1.02, 1), "loc": "upper left"} if legend else {})
-            )
-            if leg is not None:
-                plt.setp(leg.get_texts(), color=DARK_FG)
-                if legend:
-                    plt.setp(leg.get_title(), color=DARK_FG)
-
-        darken_fig(fig, ax)
-        if tight:
-            plt.tight_layout()
-        show_fig(fig)
+def render_plotly_chart(fig: go.Figure, key: str | None = None) -> None:
+    """Apply theme and render the plotly chart in Streamlit."""
+    apply_plotly_theme(fig)
+    st.plotly_chart(fig, use_container_width=True, key=key, theme=None)

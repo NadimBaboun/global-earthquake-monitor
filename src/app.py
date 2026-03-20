@@ -6,8 +6,10 @@ import streamlit as st
 from datetime import datetime, timezone, timedelta
 from data import CONFIG, load_data_by_source
 from config import UI_CONFIG
-from chart_utils import dark_chart, DARK_FG
-from constants import ALERT_HEX_COLORS, DEFAULT_ALERT_HEX
+from chart_utils import render_plotly_chart
+import plotly.express as px
+import plotly.graph_objects as go
+from constants import ALERT_HEX_COLORS
 from map_utils import render_earthquake_map
 from components import inject_custom_css, render_significant_quakes_table
 
@@ -159,8 +161,13 @@ tab_overview, tab_distribution, tab_geographic, tab_timeseries = st.tabs(
 
 with tab_overview:
     st.subheader("Top countries / regions (by earthquake count)")
-    country_counts = filtered["country"].value_counts().sort_values(ascending=False)
-    st.bar_chart(country_counts, height=UI_CONFIG["chart_height_medium"])
+    country_counts = filtered["country"].value_counts().sort_values(ascending=False).head(20)
+    fig_country = px.bar(
+        country_counts,
+        labels={"value": "Earthquake Count", "index": "Country"},
+        title="Top 20 Affected Countries/Regions",
+    )
+    render_plotly_chart(fig_country)
 
     st.subheader("Recent Significant Earthquakes")
     top_n = st.slider("Rows to show", min_value=5, max_value=10, value=10, step=1, key="significant_top_n")
@@ -173,24 +180,26 @@ with tab_distribution:
     with col5:
         st.subheader("Alert level distribution (pie)")
         alert_counts = filtered["alert_level"].value_counts().sort_values(ascending=False)
-
-        with dark_chart(title="Alert level distribution", figsize=UI_CONFIG["figsize_square"], tight=False) as (fig, ax):
-            pie_colors = [ALERT_HEX_COLORS.get(level, DEFAULT_ALERT_HEX) for level in alert_counts.index]
-            ax.pie(
-                alert_counts.values,
-                labels=alert_counts.index,
-                autopct="%1.1f%%",
-                startangle=90,
-                colors=pie_colors,
-                textprops={"color": DARK_FG},
-            )
-            ax.axis("equal")
+        fig_pie = px.pie(
+            names=alert_counts.index,
+            values=alert_counts.values,
+            color=alert_counts.index,
+            color_discrete_map=ALERT_HEX_COLORS,
+            hole=0.4,
+        )
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        render_plotly_chart(fig_pie)
 
     with col6:
         st.subheader("Magnitude distribution (histogram)")
         mags = pd.to_numeric(filtered["magnitude"], errors="coerce").dropna()
-        with dark_chart("Distribution of magnitudes", "Magnitude", "Frequency", figsize=(8, 4)) as (fig, ax):
-            ax.hist(mags, bins=UI_CONFIG["histogram_bins"], color="#3b82f6", edgecolor="#1e40af")
+        fig_hist = px.histogram(
+            mags,
+            nbins=20,
+            labels={"value": "Magnitude"},
+            title="Frequency of Earthquakes by Magnitude",
+        )
+        render_plotly_chart(fig_hist)
 
     col7, col8 = st.columns(2)
     with col7:
@@ -201,31 +210,36 @@ with tab_distribution:
         if not box_df.empty:
             top_countries = box_df["country"].value_counts().head(10).index.tolist()
             box_df = box_df[box_df["country"].isin(top_countries)]
-            order = (
-                box_df.groupby("country")["magnitude"]
-                .median()
-                .sort_values(ascending=False)
-                .index.tolist()
+            fig_box = px.box(
+                box_df,
+                x="country",
+                y="magnitude",
+                color="country",
+                points="outliers",
+                title="Magnitude Range in Top 10 Countries",
+                labels={"magnitude": "Magnitude", "country": "Country"},
             )
-            data = [box_df.loc[box_df["country"] == c, "magnitude"].values for c in order]
-            with dark_chart("Magnitude by country (top 10)", "Country", "Magnitude", rotate_x=True) as (fig, ax):
-                ax.boxplot(data, tick_labels=order, showfliers=False)
+            render_plotly_chart(fig_box)
         else:
             st.info("Not enough data for boxplot.")
 
     with col8:
         st.subheader("Alert levels by country (stacked bar)")
-        stacked = (
-            filtered.groupby(["country", "alert_level"])
-            .size()
-            .unstack(fill_value=0)
-        )
-        if not stacked.empty:
-            top = stacked.sum(axis=1).sort_values(ascending=False).head(10).index
-            stacked = stacked.loc[top]
-            with dark_chart("Alert levels by country", "Country", "Count", rotate_x=True, legend="Alert level") as (fig, ax):
-                stacked.plot(kind="bar", stacked=True, ax=ax,
-                             color=[ALERT_HEX_COLORS.get(c, DEFAULT_ALERT_HEX) for c in stacked.columns])
+        if not filtered.empty:
+            alert_by_country = filtered.groupby(["country", "alert_level"]).size().reset_index(name="count")
+            top_countries = alert_by_country.groupby("country")["count"].sum().sort_values(ascending=False).head(10).index
+            alert_by_country = alert_by_country[alert_by_country["country"].isin(top_countries)]
+            
+            fig_stacked = px.bar(
+                alert_by_country,
+                x="country",
+                y="count",
+                color="alert_level",
+                color_discrete_map=ALERT_HEX_COLORS,
+                title="Alert Levels across Top 10 Countries",
+                labels={"count": "Earthquake Count", "country": "Country", "alert_level": "Alert Level"},
+            )
+            render_plotly_chart(fig_stacked)
         else:
             st.info("No data for stacked bar chart.")
 
@@ -239,24 +253,38 @@ with tab_distribution:
     if felt_df.empty:
         st.info("No felt-report data available for the current filters.")
     else:
-        felt_top = felt_df.sort_values("felt", ascending=False).head(10).copy()
-        felt_top["label"] = felt_top.apply(
-            lambda r: f"{r['place']} (M{r['magnitude']:.1f})" if pd.notna(r["magnitude"]) else f"{r['place']} (M N/A)",
-            axis=1,
+        felt_top = felt_df.sort_values("felt", ascending=False).head(10)
+        fig_felt = px.bar(
+            felt_top,
+            x="felt",
+            y="place",
+            orientation="h",
+            color="magnitude",
+            labels={"felt": "Report Count", "place": "Location", "magnitude": "Magnitude"},
+            title="Top 10 Most-Felt Earthquakes",
+            hover_data=["magnitude", "felt"],
         )
-        felt_top = felt_top.iloc[::-1]
-        felt_series = pd.Series(felt_top["felt"].values, index=felt_top["label"].values)
-        st.bar_chart(felt_series, horizontal=True, height=UI_CONFIG["chart_height_medium"])
+        fig_felt.update_layout(yaxis={'categoryorder':'total ascending'})
+        render_plotly_chart(fig_felt)
 
 with tab_geographic:
     st.subheader("Earthquake Map (hover for details)")
     render_earthquake_map(filtered, max_points=max_points)
 
     st.subheader("Depth vs Magnitude (scatter)")
-    scatter_df = filtered[["depth_km", "magnitude"]].dropna()
+    scatter_df = filtered[["depth_km", "magnitude", "place", "alert_level"]].dropna(subset=["depth_km", "magnitude"])
     if not scatter_df.empty:
-        with dark_chart("Depth vs Magnitude", "Depth (km)", "Magnitude") as (fig, ax):
-            ax.scatter(scatter_df["depth_km"], scatter_df["magnitude"], alpha=0.5, s=15, c="#3b82f6")
+        fig_scatter = px.scatter(
+            scatter_df,
+            x="depth_km",
+            y="magnitude",
+            color="alert_level",
+            color_discrete_map=ALERT_HEX_COLORS,
+            hover_data=["place", "magnitude", "depth_km"],
+            labels={"depth_km": "Depth (km)", "magnitude": "Magnitude", "alert_level": "Alert Level"},
+            title="Magnitude vs Depth Distribution",
+        )
+        render_plotly_chart(fig_scatter)
     else:
         st.info("Not enough data for scatter plot.")
 
@@ -264,25 +292,69 @@ with tab_timeseries:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Daily earthquake count")
-        st.line_chart(daily_count)
+        fig_daily = px.line(
+            daily_count.reset_index(),
+            x="date_utc",
+            y=0,
+            labels={"date_utc": "Date (UTC)", "0": "Count"},
+            title="Frequency over Time",
+        )
+        render_plotly_chart(fig_daily)
     with col2:
         st.subheader("Daily average magnitude")
-        st.line_chart(daily_avg_mag)
+        fig_avg_mag = px.line(
+            daily_avg_mag.reset_index(),
+            x="date_utc",
+            y="magnitude",
+            labels={"date_utc": "Date (UTC)", "magnitude": "Avg Magnitude"},
+            title="Energy Trend over Time",
+        )
+        render_plotly_chart(fig_avg_mag)
 
     col3, col4 = st.columns(2)
     with col3:
         st.subheader("Cumulative earthquakes")
-        st.line_chart(cumulative_quakes)
+        fig_cumul = px.area(
+            cumulative_quakes.reset_index(),
+            x="date_utc",
+            y=0,
+            labels={"date_utc": "Date (UTC)", "0": "Total Quakes"},
+            title="Cumulative Growth",
+        )
+        render_plotly_chart(fig_cumul)
     with col4:
         st.subheader("Alert level distribution")
         level_counts = filtered["alert_level"].value_counts().sort_values(ascending=False)
-        st.bar_chart(level_counts, height=UI_CONFIG["chart_height_small"])
+        fig_lvl_bar = px.bar(
+            level_counts,
+            labels={"index": "Alert Level", "value": "Count"},
+            color=level_counts.index,
+            color_discrete_map=ALERT_HEX_COLORS,
+            title="Totals by Alert Level",
+        )
+        render_plotly_chart(fig_lvl_bar)
 
     st.subheader("Daily earthquakes (7-day rolling average)")
     rolling = daily_count.rolling(7).mean()
-    with dark_chart("Daily earthquakes (smoothed)", "Date (UTC)", "Count", figsize=UI_CONFIG["figsize_wide"], rotate_x=True, legend="") as (fig, ax):
-        ax.plot(daily_count.index, daily_count.values, label="Daily", alpha=0.4)
-        ax.plot(rolling.index, rolling.values, label="7-day rolling avg")
+    
+    fig_smooth = go.Figure()
+    fig_smooth.add_trace(go.Scatter(
+        x=daily_count.index, y=daily_count.values,
+        mode='lines', name='Daily Count',
+        line=dict(color='#3b82f6', width=1),
+        opacity=0.4
+    ))
+    fig_smooth.add_trace(go.Scatter(
+        x=rolling.index, y=rolling.values,
+        mode='lines', name='7-day rolling avg',
+        line=dict(color='#60a5fa', width=3)
+    ))
+    fig_smooth.update_layout(
+        title="Smoothed Earthquake Trends",
+        xaxis_title="Date (UTC)",
+        yaxis_title="Count",
+    )
+    render_plotly_chart(fig_smooth)
 
 # Timed auto-refresh (10 min) for live dashboard mode
 if auto_refresh:
